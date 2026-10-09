@@ -224,3 +224,202 @@
     </style>
 </head>
 <body>
+    <div id="map"></div>
+
+    <div class="recenter-btn" onclick="recenterToUser()" title="Back to my location">🎯</div>
+
+    <div class="top-nav">
+        <div class="chip chip-voice" onclick="toggleVoiceAssistance()" id="voice-chip">🔊 Voice Off</div>
+        <div class="chip chip-traffic" onclick="toggleTrafficOverlay()" id="traffic-chip">🚦 Show Traffic</div>
+        <div class="chip" onclick="toggleGodMode()" id="judge-chip">⚡ God Mode</div>
+        <div class="chip chip-hazard" onclick="triggerGodModeHazard()" id="god-drop-chip" style="display:none;">💥 Drop Flood</div>
+        <div class="chip chip-clear" onclick="clearAllHazards()" id="clear-hazards-chip" style="display:none;">🗑️ Clear Floods</div>
+        <div class="chip chip-heat" onclick="toggleHeatMode()" id="heat-chip">☀️ Heatwave Help</div>
+        <div class="chip" onclick="enableCompassSensor()" id="compass-chip">🧭 Compass</div>
+        <button class="chip chip-install" id="pwa-install-btn" style="display:none;" onclick="triggerPWAInstall()">📲 Install</button>
+        <div class="chip" onclick="openModal('about-modal')">ℹ️ About</div>
+    </div>
+
+    <div class="bottom-sheet">
+        <div class="sheet-content-wrapper">
+            <div class="route-header">
+                <div>
+                    <div class="eta-title" id="eta-display">Where are you going?</div>
+                    <div class="distance-sub" id="dist-display">Pick a destination to see a safe route</div>
+                </div>
+                <span class="advisory-badge">Drive Safe</span>
+            </div>
+
+            <div class="nav-cue-box">
+                <span id="nav-cue-text">🧭 Waiting for a destination…</span>
+                <small style="color: var(--primary); cursor: pointer;" onclick="rotateUserAngle(45)">↻ 45°</small>
+            </div>
+
+            <div class="vehicle-matrix-title">Pick your ride:</div>
+            <div class="vehicle-grid">
+                <div class="vehicle-btn selected" id="v-BIKE" onclick="selectVehicle('BIKE')">
+                    <span>🛵</span>
+                    <strong>Two-Wheeler</strong>
+                    <small>skip &gt;15cm water</small>
+                </div>
+                <div class="vehicle-btn" id="v-SEDAN" onclick="selectVehicle('SEDAN')">
+                    <span>🚗</span>
+                    <strong>Sedan</strong>
+                    <small>skip &gt;30cm water</small>
+                </div>
+                <div class="vehicle-btn" id="v-SUV" onclick="selectVehicle('SUV')">
+                    <span>🚙</span>
+                    <strong>SUV / 4x4</strong>
+                    <small>skip &gt;45cm water</small>
+                </div>
+            </div>
+
+            <div class="action-row">
+                <button class="btn btn-primary" onclick="openRouteModal()">📍 Set Destination</button>
+                <button class="btn btn-report" onclick="openWaterlogReportModal()">⚠️ Report Flood</button>
+            </div>
+        </div>
+
+        <div class="sheet-footer-links">
+            <a onclick="openModal('privacy-modal')">Privacy</a> • 
+            <a onclick="openModal('terms-modal')">Terms</a> • 
+            <a onclick="toggleStartGPSMode()" id="gps-mode-toggle">GPS: On</a>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="route-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">🗺️ Where to?</h3>
+                <button class="modal-close" onclick="closeModal('route-modal')">×</button>
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label style="font-size: 11px; color: var(--text-sub); display:block; margin-bottom: 4px;">Starting from:</label>
+                <div style="display:flex; gap: 6px; align-items: flex-start;">
+                    <div class="geo-input-wrap">
+                        <input type="text" id="start-input" placeholder="My location, a shop, society, office..." autocomplete="off" style="width:100%; padding: 9px; border-radius: 8px; background:#070d1e; color:#fff; border:1px solid var(--card-border); font-size: 12px;">
+                        <div id="start-autocomplete" class="autocomplete-dropdown"></div>
+                    </div>
+                    <button class="btn btn-primary" style="padding: 0 10px; font-size: 11px; height: 38px;" onclick="useLiveGPSForStart()">🛰️ Use GPS</button>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="font-size: 11px; color: var(--text-sub); display:block; margin-bottom: 4px;">Going to:</label>
+                <div class="geo-input-wrap">
+                    <input type="text" id="end-input" placeholder="Shop, society gate, office tower, address..." autocomplete="off" style="width:100%; padding: 9px; border-radius: 8px; background:#070d1e; color:#fff; border:1px solid var(--card-border); font-size: 12px;">
+                    <div id="end-autocomplete" class="autocomplete-dropdown"></div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 14px;">
+                <label style="font-size: 11px; color: var(--text-sub); display:block; margin-bottom: 4px;">Quick picks:</label>
+                <div style="display:flex; gap: 6px; flex-wrap: wrap;">
+                    <span class="chip" onclick="quickLocalSearch('shop supermarket store near me')">🏬 Shops near me</span>
+                    <span class="chip" onclick="quickLocalSearch('apartment society residential building')">🏡 Societies</span>
+                    <span class="chip" onclick="quickLocalSearch('office building private company')">🏢 Offices</span>
+                    <span class="chip" onclick="applyPreset('Sector 62 Noida', 'Sector 57 Noida')">Sec 62 ➔ 57</span>
+                    <span class="chip" onclick="applyPreset('Rajiv Chowk Delhi', 'India Gate Delhi')">Rajiv Chowk ➔ India Gate</span>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" style="width: 100%;" onclick="applyCustomRoute()">Let's Go</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="report-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">⚠️ Report a Flooded Road</h3>
+                <button class="modal-close" onclick="closeModal('report-modal')">×</button>
+            </div>
+            
+            <p style="font-size: 11.5px; color: var(--text-sub); margin-bottom: 10px; line-height: 1.4;">
+                🛡️ To keep reports honest, every submission is checked against your photo, GPS, and the live rain radar.
+            </p>
+
+            <div style="margin-bottom: 10px;">
+                <label style="font-size: 11px; color: var(--text-sub); display:block; margin-bottom: 3px;">How deep is the water?</label>
+                <select id="report-depth" style="width:100%; padding: 8px; border-radius: 8px; background:#070d1e; color:#fff; border:1px solid var(--card-border); font-size: 12px;">
+                    <option value="ANKLE"> Up to the ankle (~15 cm) — tough for scooters</option>
+                    <option value="KNEE"> Up to the knee (~30 cm) — tough for cars</option>
+                    <option value="ENGINE" selected> Above the engine (>45 cm) — don't drive through</option>
+                </select>
+            </div>
+
+            <div id="judge-sample-box" style="display:none; background: rgba(0, 180, 216, 0.08); padding: 8px; border-radius: 10px; margin-bottom: 10px; border: 1px dashed var(--primary);">
+                <label style="font-size: 11px; color: var(--primary); display:block; margin-bottom: 4px; font-weight:700;">
+                    ⚡ God Mode: Test the photo check
+                </label>
+                <div class="sample-photo-box">
+                    <div class="sample-card" id="sample-flood-btn" onclick="selectSamplePhoto('FLOOD')">
+                        <img src="https://images.unsplash.com/photo-1547683905-f686c993aae5?w=300&q=80" alt="Flood">
+                        <span style="font-size:10px; font-weight:bold; color:var(--accent-green);">🌊 Real flood photo</span>
+                    </div>
+                    <div class="sample-card" id="sample-dry-btn" onclick="selectSamplePhoto('DRY')">
+                        <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&q=80" alt="Dry Road">
+                        <span style="font-size:10px; font-weight:bold; color:var(--accent-danger);">☀️ Dry road (should fail)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label style="font-size: 11px; color: var(--text-sub); display:block; margin-bottom: 3px;">Add a photo of the road <span style="color:var(--accent-danger); font-weight:bold;">(required)</span>:</label>
+                <input type="file" id="photo-input" accept="image/*" capture="environment" onchange="handleFileInputChange(event)" style="width:100%; font-size:11px; color:#cbd5e1; border:1px dashed var(--card-border); padding:6px; border-radius:8px;">
+            </div>
+
+            <div id="ai-status" style="font-size: 11px; color: var(--primary); margin-bottom: 10px; display:none; line-height: 1.5; background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px;"></div>
+
+            <button class="btn btn-primary" style="width: 100%;" onclick="submitWaterlogReport()">Send Report</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="about-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">💧 About AquaTread</h3>
+                <button class="modal-close" onclick="closeModal('about-modal')">×</button>
+            </div>
+            <p style="font-size: 12px; line-height: 1.5; color: var(--text-sub); margin-bottom: 10px;">
+                AquaTread is a small tool built by four engineering students who were tired of Google Maps sending them into flooded underpasses every monsoon. It picks a route that actually matches your vehicle's ground clearance.
+            </p>
+            <ul style="font-size: 11.5px; color: var(--text-sub); padding-left: 16px; line-height: 1.6; margin-bottom: 12px;">
+                <li><b>Ride-aware routing:</b> Scooters avoid water over 15cm, sedans over 30cm, SUVs over 45cm.</li>
+                <li><b>Fake-photo filter:</b> We check the photo, the GPS tag, and the live rain radar before trusting a report.</li>
+                <li><b>Live detours:</b> If a flood is on your path, we quietly recalculate and show you a safer way.</li>
+                <li><b>Voice guidance:</b> Hands stay on the wheel, eyes stay on the road.</li>
+                <li><b>Finds the small stuff:</b> Local shops, housing societies, and office towers show up in search.</li>
+            </ul>
+            <p style="font-size: 11px; color: var(--text-sub); margin-bottom: 10px; font-style: italic;">
+                Built by Team ThunderStrike — Hiya, Ayati, Srishti & Devansh (JSS Noida).
+            </p>
+            <button class="btn btn-primary" style="width: 100%;" onclick="closeModal('about-modal')">Got it</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="privacy-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">🛡️ Your Privacy</h3>
+                <button class="modal-close" onclick="closeModal('privacy-modal')">×</button>
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-sub); line-height: 1.5;">
+                <p>Your location stays on your phone. We don't log where you've been, and photo GPS tags are only used once, right when you submit a report, to confirm you were actually there.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="terms-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">📄 A quick note</h3>
+                <button class="modal-close" onclick="closeModal('terms-modal')">×</button>
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-sub); line-height: 1.5;">
+                <p>Our detours are suggestions, not instructions. If you see a traffic barricade or an official flood warning, please listen to that first.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
