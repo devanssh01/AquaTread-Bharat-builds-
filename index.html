@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AquaTread - Vehicle-Adaptive Navigation</title>
+    
+    <meta name="description" content="Crowdsourced, AI-verified navigation routing around waterlogged urban streets based on vehicle clearance.">
+    <meta name="theme-color" content="#0b132b">
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💧</text></svg>">
+    <link rel="manifest" href="data:application/manifest+json,{
+        %22name%22:%22AquaTread Navigation%22,
+        %22short_name%22:%22AquaTread%22,
+        %22start_url%22:%22./%22,
+        %22scope%22:%22./%22,
+        %22display%22:%22standalone%22,
+        %22background_color%22:%22%230b132b%22,
+        %22theme_color%22:%22%2300b4d8%22
+    }">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #0b132b;
+            --card-bg: rgba(11, 19, 43, 0.92);
+            --card-border: rgba(255, 255, 255, 0.12);
+            --primary: #00b4d8;
+            --accent-green: #10b981;
+            --accent-warning: #f59e0b;
+            --accent-danger: #ef4444;
+            --text-light: #f8fafc;
+            --text-sub: #94a3b8;
+            --route-blue: #00b4d8;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body, html { height: 100%; width: 100%; overflow: hidden; background: #070d1e; color: var(--text-light); }
+
+        #map { height: 100vh; width: 100vw; z-index: 1; background: #070d1e; }
+
+        .leaflet-tile {
+            filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+        }
+
+        .leaflet-pane.trafficTilePane {
+            z-index: 250;
+            pointer-events: none;
+        }
+        
+        .leaflet-pane.trafficTilePane .leaflet-tile {
+            filter: none !important;
+        }
+
+        .leaflet-pane.trafficVectorPane {
+            z-index: 465;
+            pointer-events: none;
+        }
+        
+        .leaflet-overlay-pane { z-index: 460 !important; }
+        .leaflet-marker-pane { z-index: 470 !important; }
+
+        .top-nav {
+            position: absolute; top: 10px; left: 10px; right: 10px; z-index: 1000;
+            display: flex; gap: 6px; overflow-x: auto; white-space: nowrap;
+            padding-bottom: 4px; scrollbar-width: none; transition: all 0.3s ease;
+        }
+        .top-nav::-webkit-scrollbar { display: none; }
+
+        .chip {
+            background: var(--card-bg); backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border); border-radius: 20px;
+            padding: 6px 12px; font-size: 11.5px; font-weight: 600; color: var(--text-light);
+            display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4); flex-shrink: 0; transition: all 0.2s;
+        }
+
+        .chip.active { background: var(--primary); color: #0b132b; border-color: var(--primary); font-weight: 700; }
+        .chip-voice.active { background: #10b981; color: #000; border-color: #10b981; font-weight: 700; }
+        .chip-traffic.active { background: #ef4444; color: #fff; border-color: #ef4444; font-weight: 700; }
+        .chip-heat.active { background: #f59e0b; color: #000; border-color: #f59e0b; }
+        .chip-hazard { background: rgba(239, 68, 68, 0.25); color: #ef4444; border: 1px solid #ef4444; }
+        .chip-clear { background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; }
+        .chip-install { background: #10b981; color: #000; font-weight: 700; border: none; animation: pulse 2s infinite; }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .recenter-btn {
+            position: absolute; bottom: 44vh; right: 14px; z-index: 1000;
+            background: var(--card-bg); backdrop-filter: blur(14px);
+            border: 1px solid var(--primary); border-radius: 50%;
+            width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+            font-size: 20px; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+            transition: all 0.2s ease; user-select: none;
+        }
+        .recenter-btn:hover { background: var(--primary); color: #0b132b; transform: scale(1.08); }
+        .recenter-btn:active { transform: scale(0.92); }
+
+        .bottom-sheet {
+            position: absolute; bottom: 10px; left: 10px; right: 10px; z-index: 1000;
+            background: var(--card-bg); backdrop-filter: blur(16px);
+            border: 1px solid var(--card-border); border-radius: 16px;
+            padding: 14px; max-height: 42vh; overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6); transition: all 0.3s ease;
+        }
+
+        @media (min-width: 768px) {
+            .top-nav { left: 390px; top: 14px; right: 14px; }
+            .bottom-sheet {
+                top: 14px; left: 14px; bottom: 14px; right: auto; width: 360px;
+                max-height: none; height: calc(100vh - 28px);
+                display: flex; flex-direction: column; justify-content: space-between;
+                border-radius: 20px; padding: 18px;
+            }
+            .recenter-btn { bottom: 24px; right: 24px; width: 48px; height: 48px; font-size: 22px; }
+            .sheet-content-wrapper { display: flex; flex-direction: column; gap: 12px; }
+            .leaflet-control-zoom { margin-top: 60px !important; margin-right: 16px !important; }
+        }
+
+        .route-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+        .eta-title { font-size: 22px; font-weight: 800; color: var(--primary); }
+        .distance-sub { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+        
+        .advisory-badge {
+            font-size: 10px; padding: 3px 7px; border-radius: 6px;
+            background: rgba(245, 158, 11, 0.15); color: var(--accent-warning);
+            border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 600;
+        }
+
+        .nav-cue-box {
+            background: rgba(255,255,255,0.05); border-radius: 10px; padding: 8px 12px;
+            margin-bottom: 8px; border-left: 3px solid var(--primary);
+            font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: space-between;
+        }
+        
