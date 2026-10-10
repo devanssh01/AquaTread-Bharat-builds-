@@ -250,32 +250,48 @@
         <div class="chip" onclick="openModal('about-modal')">ℹ️ About</div>
     </div>
     <div id="guideModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(11, 19, 43, 0.85); z-index: 9999; backdrop-filter: blur(5px); justify-content: center; align-items: center;">
-    <div style="background: #1c2541; border: 1px solid #38bdf8; border-radius: 16px; width: 90%; max-width: 500px; padding: 24px; color: #f8fafc; box-shadow: 0 20px 50px rgba(0,0,0,0.6); max-height: 85vh; overflow-y: auto; font-family: sans-serif;">
+    <div style="background: #1c2541; border: 1px solid #38bdf8; border-radius: 16px; width: 90%; max-width: 520px; padding: 24px; color: #f8fafc; box-shadow: 0 20px 50px rgba(0,0,0,0.6); max-height: 85vh; overflow-y: auto; font-family: sans-serif;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; margin-bottom: 16px;">
             <h3 style="margin: 0; color: #38bdf8; font-size: 18px;">🏆 How to Test AquaTread</h3>
             <span onclick="toggleGuideModal()" style="cursor: pointer; font-size: 22px; color: #94a3b8;">&times;</span>
         </div>
 
         <div style="font-size: 13px; line-height: 1.6; color: #cbd5e1;">
-            
-            <div style="background: rgba(16, 185, 129, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 12px; border-left: 3px solid #10b981;">
+
+            <!-- NORMAL MODE -->
+            <div style="background: rgba(16, 185, 129, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #10b981;">
                 <strong style="color: #10b981;">🌍 Normal Mode (Real Users):</strong><br>
-                Real drivers tap <strong>"⚠️ Report Flood"</strong>, upload a street photo. Our Canvas scanner + AWS Rekognition AI + Open-Meteo Rain Radar verify it, then the hazard is dropped and other vehicles get auto-rerouted.
+                Drivers tap <strong>"⚠️ Report Flood"</strong>. Canvas scanner + AWS Rekognition AI + Live Rain Radar verify it → hazard drops → vehicles auto-reroute.
             </div>
 
-            <div style="background: rgba(245, 158, 11, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 12px; border-left: 3px solid #f59e0b;">
-                <strong style="color: #f59e0b;">⚡ God Mode (For Judges Only):</strong><br>
-                Since you are testing from a desk (not standing in a real flood), turn ON <strong>⚡ God Mode</strong> → double-click anywhere on the map/route to instantly simulate a verified flood and watch live vehicle-aware rerouting!
+            <!-- GOD MODE -->
+            <div style="background: rgba(245, 158, 11, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #f59e0b;">
+                <strong style="color: #f59e0b;">⚡ God Mode (For Judges):</strong><br>
+                Turn ON <strong>⚡ God Mode</strong> → double-click map/route to drop a simulated flood instantly and watch live vehicle-aware rerouting.
             </div>
 
+            <!-- VEHICLE CLEARANCE -->
             <div style="background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00b4d8;">
-                <strong style="color: #38bdf8;">🛵 🚗 🚙 Vehicle Clearance Engine:</strong><br>
-                Switch Bike (15cm) / Sedan (30cm) / SUV (45cm). Router blocks any water deeper than your vehicle's exhaust height.
+                <strong style="color: #38bdf8;">🛵🚗🚙 Vehicle Clearance:</strong> Switch Bike (15cm) / Sedan (30cm) / SUV (45cm). Router blocks water deeper than your exhaust height.
             </div>
 
+            <!-- TRAFFIC MODE -->
+            <div style="background: rgba(239, 68, 68, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #ef4444;">
+                <strong style="color: #f87171;">🚦 Live Traffic Overlay:</strong> Transparent Google traffic tiles load on a dedicated pane (z-index 465) perfectly mapping speed vectors inside the blue route.
+            </div>
+
+            <!-- SENSORS: VOICE & COMPASS -->
+            <div style="background: rgba(168, 85, 247, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #a855f7;">
+                <strong style="color: #c084fc;">🧭 Compass & 🔊 Voice Cues (Native PWA):</strong><br>
+                <strong>Compass:</strong> Binds Device Orientation API for live heading.<br>
+                <strong>Voice:</strong> Web Speech API announces contextual detours.
+            </div>
+
+            <!-- HEATWAVE & RECENTER -->
             <div style="background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00b4d8;">
-                <strong style="color: #38bdf8;">🔥 Heatwave Mode + 🎯 Recenter:</strong><br>
-                Heatwave fetches live drinking water taps (Overpass API). Bullseye button flies map back to your GPS.
+                <strong style="color: #38bdf8;">🔥 Heatwave Help & 🎯 Recenter:</strong><br>
+                <strong>Heatwave:</strong> Fetches live OSM drinking water taps (Overpass API).<br>
+                <strong>🎯 Bullseye:</strong> Flies map directly back to your GPS location.
             </div>
 
         </div>
