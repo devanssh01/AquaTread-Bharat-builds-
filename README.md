@@ -1,114 +1,62 @@
-# AquaTread-Bharat-builds-
-Here is the updated `README.md` with **JSSUN Noida, Uttar Pradesh** added for all team members and subtitle references.
+# 💧 AquaTread — Vehicle-Adaptive Emergency Navigation PWA
 
-You can copy and paste this directly into your `README.md` file in VS Code:
+> **AWS Bharat Build Tour Hackathon Submission** | **Team ThunderStrike**  
+> *Devansh Upadhyay, Hiya Khanna, Ayati, Srishti (JSSUN Noida)*
 
-```markdown
-# 🌊 AquaTread-Bharat-builds-
-
-> **Vehicle-Adaptive Navigation for Waterlogged Urban Streets**
-> Built by **Team ThunderStrike** (JSSUN Noida, Uttar Pradesh) for the **AWS Bharat Build Tour Hackathon** at Delhi Technological University (DTU).
-
-[![Live App](https://img.shields.io/badge/Live%20App-GitHub%20Pages-00D2FF?style=for-the-badge&logo=github)](https://devanssh01.github.io/AquaTread/)
-[![AWS Backend](https://img.shields.io/badge/AWS-Rekognition%20%7C%20Lambda-FF9900?style=for-the-badge&logo=amazon-aws)](https://github.com/devanssh01/AquaTread/tree/main/backend)
+Live PWA Demo: [https://devanssh01.github.io/AquaTread-Bharat-builds-/](https://devanssh01.github.io/AquaTread-Bharat-builds-/)
 
 ---
 
-## 📌 The Problem
+## 🎯 The Problem
+During monsoons, traditional navigation apps (Google Maps, Waze) treat all vehicles identically. A 15cm flooded underpass causes binary road closures for everyone—forcing unnecessary detours for heavy SUVs while guiding scooters straight into deep water traps.
 
-During heavy monsoon rains in NCR, traditional navigation apps show everyone the exact same route based purely on traffic speeds. But a flooded underpass or waterlogged street that an SUV can cross easily might completely drown a scooter engine or stall a low-clearance sedan.
-
-When commuters trust generic navigation during severe rain, two main issues arise:
-1. Vehicles stall inside submerged underpasses, causing massive urban gridlocks.
-2. Crowdsourced reporting apps get spammed with fake reports, screenshots, and non-flood photos.
-
----
-
-## 💡 Our Solution
-
-**AquaTread-Bharat-builds** is a Progressive Web App (PWA) designed to calculate safe detour routes based on your **vehicle's physical ground clearance**. 
-
-Instead of blocking roads globally for everyone, AquaTread-Bharat-builds checks reported waterlogging depths against your active vehicle profile. If a waterlogged area is too deep for your vehicle and intersects your calculated path, the app automatically reroutes you around the danger zone using OSRM detour waypoint logic.
+## ⚡ How AquaTread Solves It
+AquaTread introduces a **Vehicle Clearance Matrix** paired with a **4-Layer Anti-Fake AI Verification Engine**:
+* 🛵 **Two-Wheeler (15cm threshold):** Reroutes around ankle-deep waterlogging.
+* 🚗 **Sedan (30cm threshold):** Passes ankle water, reroutes around knee-deep floods.
+* 🚙 **SUV / 4x4 (45cm threshold):** Safely passes mild/moderate water, saving time & fuel.
 
 ---
 
-## ✨ Core Features
+## 🏆 Competitive Landscape: Why AquaTread Wins
 
-### 🛵 1. Vehicle Clearance Tolerances
-AquaTread-Bharat-builds evaluates road safety against three distinct vehicle tiers:
-* 🛵 **Two-Wheelers:** Reroutes if water depth exceeds **15 cm** (Ankle deep).
-* 🚗 **Sedans:** Safe in ankle deep; reroutes if depth exceeds **30 cm** (Knee deep).
-* 🚙 **SUVs / 4x4s:** Clears ankle and knee deep; reroutes if depth exceeds **45 cm** (Engine deep).
-
-### 🤖 2. 3-Step Anti-Fake Security Pipeline
-Crowdsourced hazard reporting usually breaks down due to fake submissions. AquaTread screens every uploaded photo using a 3-step check:
-1. **AWS Rekognition & Canvas Spectrum Analysis:** Scans image pixels for genuine water reflections and monsoon surface ripples. Rejects:
-   * **Screenshots & UI Graphics:** Catches OS screenshot filenames and map UI artifacts.
-   * **Human Hands & Body Photos:** Uses RGB warm hue spectrum checking ($R > G > B$) to reject selfies and hand photos.
-   * **Gutter & Sewage Sludge:** Uses algae green/chemical scum spectrum ($G > R + 12$) and black drain hole detection ($RGB < 22$) to block open drains and manholes.
-   * **AI / Stock Downloads:** Screens filenames for stock imagery and AI generation signatures.
-2. **EXIF GPS Hardware Match:** Confirms the photo metadata matches where the user is currently standing.
-3. **Open-Meteo Satellite Rain Radar:** Verifies live rain telemetry ($>2.0\text{ mm/h}$) before logging or clearing hazards from the map.
-
-### 📍 3. High-Contrast Navigation & Live Traffic
-* **AquaTread Blue Polyline:** Active route lines are rendered in high-contrast blue (`#00b4d8`) with an ambient outer glow so the path never blends into green traffic roads or dark map tiles.
-* **Keyless Google Traffic Layer:** Live Google Traffic tile streams are isolated in a custom Leaflet pane (`trafficTilePane`) to prevent CSS dark-mode inversion filters from corrupting traffic line colors.
-* **Vivid Congestion Segments:** Congestion vectors (Red `#dc2626`, Amber `#d97706`, Emerald `#059669`) render along the path for instant long-distance visibility.
-
-### 🏬 4. Local & Private Place Intelligence
-* **Nominatim POI Search:** Autocomplete supports local shops (🏬), private office parks (🏢), housing societies (🏡), restaurants, and micro-landmarks using OSM `addressdetails`, `extratags`, and `namedetails`.
-* **Draggable Pins & Reverse Geocoding:** Both start and destination markers can be dragged anywhere on the map, updating exact venue names and triggering live OSRM route recalculation on `dragend`.
-
-### ☀️ 5. Monsoon & Summer Heatwave Dual Mode
-* **🌧️ Monsoon Mode:** Standard flood detour navigation and waterlogging depth monitoring.
-* **☀️ Heatwave Mode:** Switches route styling to highlight municipal drinking water tanker points and emergency hydration hubs during extreme summer heatwaves.
-
-### ⚡ 6. God Mode Sandbox for Testing
-* Built-in judge testing toolbar with pre-validated sample tests (`🌊 Valid Flood` vs `☀️ Fake Dry Road`).
-* **`💥 Drop Hazard`** drops mid-route flood barriers on demand.
-* **`🗑️ Clear Hazards`** wipes sandbox hazards cleanly.
+| Feature | 🚗 Google Maps / Waze | 📍 MapMyIndia (Mappls) | 🏛️ Govt Portals | 💧 AquaTread (Our App) |
+|---|---|---|---|---|
+| **Routing Logic** | Binary (Open/Closed) | Static Waterlog Pins | Macro-level Text Alerts | **Vehicle-Adaptive Clearance Thresholds** |
+| **Fake Report Protection** | ❌ None (Spam Prone) | ❌ None | ❌ Manual (Slow) | **✅ 4-Layer AI Engine (Canvas + AWS Rekognition)** |
+| **Rain Verification** | ❌ No Weather Crosscheck | ❌ No Weather Crosscheck | ❌ No API Crosscheck | **✅ Open-Meteo Weather Radar Live API** |
+| **Monsoon Performance** | Heavy App (100MB+) | Heavy Web App | Clunky Govt Portal | **✅ Sub-300ms Offline-Cached Single-File PWA** |
+| **Emergency Heatwave** | ❌ None | ❌ None | ❌ Static List | **✅ Overpass API 3km Water Point Mapping** |
 
 ---
 
-## 🏗️ How It Works
-
-```text
-[ Commuter PWA ] ──> Select Vehicle (Two-Wheeler / Sedan / SUV)
-       │
-       ├──> [ Search FROM & TO ] ──> OSRM Engine calculates route
-       │                                  │
-       └──> [ Hazard Reported ] ──────────┼──> Checks water depth vs vehicle clearance
-                                          │
-                                          └──> Clear Blue Route or Safe Detour
-```
+## 🛡️ 4-Layer Anti-Fake Shield
+1. **HTML5 Canvas Pixel Spectrum Scan:** Rejects screenshots, indoor lighting, skin tones, and sewage/gutters on client-side.
+2. **AWS Rekognition AI (Cloud):** Lambda backend verifies asphalt/street context via Boto3, rejecting glassware/indoors.
+3. **Open-Meteo Rain Radar API:** Cross-checks active precipitation (>2.0mm/h) at report coordinates.
+4. **Proximity & EXIF Geofence:** Locks submissions within 50m radius of live user GPS.
 
 ---
 
-## 🛠️ Tech Stack
-
-* **Frontend:** HTML5, Vanilla JavaScript (ES6+), CSS3, Progressive Web App (PWA).
-* **Mapping Engine:** Leaflet.js (v1.9.4), OpenStreetMap base tiles, Google Transparent Live Traffic tile stream.
-* **Routing & Geocoding:** OSRM (Open Source Routing Machine) API, Nominatim Search & Reverse Geocoding API.
-* **Weather Telemetry:** Open-Meteo Weather Satellite API.
-* **Backend Verification:** AWS Rekognition, AWS Lambda, Python `boto3` SDK (`backend/aws_rekognition_handler.py`).
-
+## 🛠️ Tech Stack & AWS Services
+* **AWS Services:** AWS Lambda, Amazon Rekognition (Boto3 Python SDK), AWS S3
+* **Map & Routing:** Leaflet JS 1.9.4, Custom Layer Panes, OSRM Driving API (16 Waypoint Offsets)
+* **APIs:** Nominatim OpenStreetMap, Open-Meteo Weather API, Overpass OSM Drinking Water API
 ---
 
-## 👥 Team ThunderStrike
-
-* **Hiya Khanna** — JSSUN Noida, Uttar Pradesh
-* **Ayati** — JSSUN Noida, Uttar Pradesh
-* **Srishti** — JSSUN Noida, Uttar Pradesh
-* **Devansh Upadhyay** — JSSUN Noida, Uttar Pradesh
-
+## 📁 Project Structure
 ---
 
-## 🔗 Links
+AquaTread-Bharat-builds-/
+├── index.html # Complete Single-File PWA (Frontend + Logic)
+└── backend/
+└── aws_rekognition_handler.py # AWS Lambda + Amazon Rekognition (Boto3)
 
-* **Live PWA App:** https://devanssh01.github.io/AquaTread-Bharat-builds-/
-* **Backend Source Code:** [AquaTread-Bharat-builds GitHub Repository (Backend)]https://github.com/devanssh01/AquaTread-Bharat-builds-/blob/a245d3d520a09ef9a7fc068d805e9179cdca8e91/backend/aws_rekognition_handler.py
-* **Technical Blog:** Published on AWS Builder Center *(Link updated upon publishing)*
-* **Event:** Bharat Build Tour (DTU Delhi) by AWS & WeMakeDevs
-```
+## 🚀 How to Run Locally
+1. Clone the repo
+2. Open `index.html` in any modern browser (Chrome/Edge recommended)
+3. Allow Location permission when prompted
+4. For AWS Rekognition: Deploy `aws_rekognition_handler.py` as Lambda function
 
-       
+## 🎥 Demo Video
+*(Paste your YouTube/Drive demo video link here once recorded)*
