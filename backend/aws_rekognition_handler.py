@@ -3,35 +3,54 @@ import base64
 import boto3
 import logging
 
+# Setup Logging for AWS CloudWatch
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+# Initialize AWS Rekognition Client (IAM Role ensures secure access)
 rekognition = boto3.client('rekognition')
-MAX_PAYLOAD_BYTES = 5 * 1024 * 1024
+MAX_PAYLOAD_BYTES = 5 * 1024 * 1024  # 5 MB Limit to prevent memory/cost exhaustion
 
 def lambda_handler(event, context):
+    # CORS Headers - Required for API Gateway to allow frontend communication
     cors_headers = {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': '*',  # In production, replace with 'https://devanssh01.github.io'
         'Access-Control-Allow-Headers': 'Content-Type,Authorization',
         'Access-Control-Allow-Methods': 'OPTIONS,POST,DELETE'
     }
 
+    # Handle Preflight OPTIONS request (Browser safety)
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': cors_headers, 'body': ''}
 
     try:
-        body = event.get('body', '')
-        if not body or len(body) > MAX_PAYLOAD_BYTES:
-            return {'statusCode': 413, 'headers': cors_headers, 'body': json.dumps({'error': 'Payload size limit 5MB'})}
+        # 1. API Gateway Base64 & Empty Body Handling Fix
+        body = event.get('body', '') or ''
+        if event.get('isBase64Encoded'):
+            body = base64.b64decode(body).decode('utf-8')
+
+        if not body:
+            return {
+                'statusCode': 400,
+                'headers': cors_headers,
+                'body': json.dumps({'error': 'Empty request body'})
+            }
+
+        # 2. Payload Size Limit Protection (Security feature against DDoS/Spam)
+        if len(body) > MAX_PAYLOAD_BYTES:
+            return {
+                'statusCode': 413,
+                'headers': cors_headers,
+                'body': json.dumps({'error': 'Payload size limit exceeded (5MB)'})
+            }
 
         parsed_body = json.loads(body)
-        action = parsed_body.get('action', 'REPORT_HAZARD') # REPORT_HAZARD or CLEAR_HAZARD
+        action = parsed_body.get('action', 'REPORT_HAZARD') # Actions: REPORT_HAZARD or CLEAR_HAZARD
 
-        # 1. HANDLE HAZARD CLEARANCE REQUEST
+        # 3. HANDLE HAZARD CLEARANCE REQUEST
         if action == 'CLEAR_HAZARD':
             hazard_id = parsed_body.get('hazard_id')
             logger.info(f"Processing clearance request for hazard ID: {hazard_id}")
-            
             return {
                 'statusCode': 200,
                 'headers': cors_headers,
@@ -42,23 +61,31 @@ def lambda_handler(event, context):
                 })
             }
 
-        # 2. HANDLE NEW HAZARD REPORT SCAN VIA AWS REKOGNITION
+        # 4. HANDLE NEW HAZARD REPORT SCAN VIA AWS REKOGNITION
         image_base64 = parsed_body.get('image')
         if not image_base64:
-            return {'statusCode': 400, 'headers': cors_headers, 'body': json.dumps({'error': 'Missing image payload'})}
+            return {
+                'statusCode': 400, 
+                'headers': cors_headers, 
+                'body': json.dumps({'error': 'Missing image payload'})
+            }
 
+        # Strip data URI prefix if sent by browser canvas (e.g., data:image/jpeg;base64,...)
         if ',' in image_base64:
             image_base64 = image_base64.split(',')[1]
 
         image_bytes = base64.b64decode(image_base64)
 
+        # Trigger Amazon Rekognition AI Vision
         response = rekognition.detect_labels(
             Image={'Bytes': image_bytes},
             MaxLabels=15,
             MinConfidence=70.0
         )
 
+        # Extract labels and process logic
         labels = [label['Name'].lower() for label in response.get('Labels', [])]
+        
         flood_keywords = ['water', 'flood', 'puddle', 'slush', 'submerged', 'river']
         dry_keywords = ['asphalt', 'dry', 'pavement', 'street', 'road']
 
@@ -79,6 +106,16 @@ def lambda_handler(event, context):
             })
         }
 
+    except json.JSONDecodeError:
+        return {
+            'statusCode': 400,
+            'headers': cors_headers,
+            'body': json.dumps({'error': 'Invalid JSON format'})
+        }
     except Exception as e:
         logger.error(f"Error: {str(e)}")
-        return {'statusCode': 500, 'headers': cors_headers, 'body': json.dumps({'error': str(e)})}
+        return {
+            'statusCode': 500,
+            'headers': cors_headers,
+            'body': json.dumps({'error': 'Internal server error'})
+        }
