@@ -5,6 +5,18 @@
 
 Live PWA Demo: [https://devanssh01.github.io/AquaTread-Bharat-builds-/](https://devanssh01.github.io/AquaTread-Bharat-builds-/)
 
+## 🧪 30-Second Quick Testing Guide for Judges
+
+If you are testing the live app, follow these 4 quick steps:
+
+| Step | Action | What Happens (Tech Under the Hood) |
+| :--- | :--- | :--- |
+| **1. Dynamic Rerouting** | Click **`⚡ God Mode`** ➔ Double-click anywhere on the blue route line | Drops a simulated flood hazard. App dynamically triggers OSRM rerouting to bypass the hazard instantly! |
+| **2. Vehicle Matrix Check** | Toggle between **`🛵 Bike (15cm)`**, **`🚗 Sedan (30cm)`**, **`🚙 SUV (45cm)`** | Rerouting logic filters water depths based on vehicle exhaust height clearance. |
+| **3. Anti-Fake Shield** | Click **`📸 Report Flood`** & upload an image | Runs **Canvas RGB pixel scanner** (rejects skin/clothes/dry roads), queries **Open-Meteo Rain Radar (mm/h)**, and triggers **AWS Rekognition AI**. |
+| **4. Heatwave Safe-Haven** | Click **`🔥 Heatwave`** toggle | Queries live **Overpass API** for real OpenStreetMap drinking water points within 3km radius. |
+| **5. Recenter Map** | Click **`🎯` Bullseye** | Instantly flies camera back to live GPS user coordinates. |
+
 ---
 
 ## 🎯 The Problem

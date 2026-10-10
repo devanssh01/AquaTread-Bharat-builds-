@@ -241,6 +241,7 @@
         <div class="chip chip-voice" onclick="toggleVoiceAssistance()" id="voice-chip">🔊 Voice Off</div>
         <div class="chip chip-traffic" onclick="toggleTrafficOverlay()" id="traffic-chip">🚦 Show Traffic</div>
         <div class="chip" onclick="toggleGodMode()" id="judge-chip">⚡ God Mode</div>
+        <div class="chip" onclick="toggleGuideModal()" style="background: linear-gradient(135deg, #0284c7, #00b4d8); color: white; font-weight: 700;">ℹ️ Judge Guide</div>
         <div class="chip chip-hazard" onclick="triggerGodModeHazard()" id="god-drop-chip" style="display:none;">💥 Drop Flood</div>
         <div class="chip chip-clear" onclick="clearAllHazards()" id="clear-hazards-chip" style="display:none;">🗑️ Clear Floods</div>
         <div class="chip chip-heat" onclick="toggleHeatMode()" id="heat-chip">☀️ Heatwave Help</div>
@@ -248,6 +249,42 @@
         <button class="chip chip-install" id="pwa-install-btn" style="display:none;" onclick="triggerPWAInstall()">📲 Install</button>
         <div class="chip" onclick="openModal('about-modal')">ℹ️ About</div>
     </div>
+    <div id="guideModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(11, 19, 43, 0.85); z-index: 9999; backdrop-filter: blur(5px); justify-content: center; align-items: center;">
+    <div style="background: #1c2541; border: 1px solid #38bdf8; border-radius: 16px; width: 90%; max-width: 500px; padding: 24px; color: #f8fafc; box-shadow: 0 20px 50px rgba(0,0,0,0.6); max-height: 85vh; overflow-y: auto; font-family: sans-serif;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; margin-bottom: 16px;">
+            <h3 style="margin: 0; color: #38bdf8; font-size: 18px;">🏆 30-Second Testing Guide for Judges</h3>
+            <span onclick="toggleGuideModal()" style="cursor: pointer; font-size: 22px; color: #94a3b8;">&times;</span>
+        </div>
+
+        <div style="font-size: 13px; line-height: 1.6; color: #cbd5e1;">
+            <p style="margin-top: 0;"><strong style="color: #fff;">Welcome to AquaTread Bharat!</strong> Follow these steps to test our AWS engine:</p>
+            
+            <div style="background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00b4d8;">
+                <strong style="color: #38bdf8;">1. ⚡ Dynamic Rerouting (God Mode):</strong><br>
+                Click <strong>"⚡ God Mode"</strong> ➔ Double-click anywhere on the route to drop a flood hazard. Watch route reroute live!
+            </div>
+
+            <div style="background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00b4d8;">
+                <strong style="color: #38bdf8;">2. 🛵 🚗 🚙 Vehicle Clearance:</strong><br>
+                Switch between <strong>Bike (15cm)</strong>, <strong>Sedan (30cm)</strong>, and <strong>SUV (45cm)</strong> to filter water depth limits.
+            </div>
+
+            <div style="background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00b4d8;">
+                <strong style="color: #38bdf8;">3. 📸 Anti-Fake Photo Scanner:</strong><br>
+                Click <strong>"📸 Report Flood"</strong> to run Canvas CV pixel scan + Open-Meteo Rain Radar + AWS Rekognition AI!
+            </div>
+
+            <div style="background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00b4d8;">
+                <strong style="color: #38bdf8;">4. 🔥 Heatwave Mode:</strong><br>
+                Toggle <strong>"Heatwave Help"</strong> to fetch real-time OSM drinking water points via Overpass API.
+            </div>
+        </div>
+
+        <button onclick="toggleGuideModal()" style="width: 100%; margin-top: 15px; background: #38bdf8; color: #0f172a; border: none; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer;">
+            Got it! Start Testing 🚀
+        </button>
+    </div>
+</div>
 
     <div class="bottom-sheet">
         <div class="sheet-content-wrapper">
@@ -1058,7 +1095,6 @@
                 speakCue(cue);
             }
         }
-
         function toggleGodMode() {
             isGodMode = !isGodMode;
             document.getElementById('judge-chip').classList.toggle('active');
@@ -1080,6 +1116,17 @@
                 activeHazards = [];
                 if (endPos) evaluateRerouteLogic();
                 speakCue("God mode off.");
+            }
+        }
+
+
+        function toggleGuideModal() {
+                const modal = document.getElementById('guideModal');
+                if (!modal) return;
+                if (modal.style.display === 'none' || modal.style.display === '') {
+                modal.style.display = 'flex';
+                } else {
+                modal.style.display = 'none';
             }
         }
 
