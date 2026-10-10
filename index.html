@@ -252,22 +252,39 @@
     <div id="guideModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(11, 19, 43, 0.85); z-index: 9999; backdrop-filter: blur(5px); justify-content: center; align-items: center;">
     <div style="background: #1c2541; border: 1px solid #38bdf8; border-radius: 16px; width: 90%; max-width: 500px; padding: 24px; color: #f8fafc; box-shadow: 0 20px 50px rgba(0,0,0,0.6); max-height: 85vh; overflow-y: auto; font-family: sans-serif;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; margin-bottom: 16px;">
-            <h3 style="margin: 0; color: #38bdf8; font-size: 18px;">🏆 30-Second Testing Guide for Judges</h3>
+            <h3 style="margin: 0; color: #38bdf8; font-size: 18px;">🏆 How to Test AquaTread</h3>
             <span onclick="toggleGuideModal()" style="cursor: pointer; font-size: 22px; color: #94a3b8;">&times;</span>
         </div>
 
         <div style="font-size: 13px; line-height: 1.6; color: #cbd5e1;">
-            <p style="margin-top: 0;"><strong style="color: #fff;">Welcome to AquaTread Bharat!</strong> Follow these steps to test our AWS engine:</p>
             
-            <div style="background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00b4d8;">
-                <strong style="color: #38bdf8;">1. ⚡ Dynamic Rerouting (God Mode):</strong><br>
-                Click <strong>"⚡ God Mode"</strong> ➔ Double-click anywhere on the route to drop a flood hazard. Watch route reroute live!
+            <div style="background: rgba(16, 185, 129, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 12px; border-left: 3px solid #10b981;">
+                <strong style="color: #10b981;">🌍 Normal Mode (Real Users):</strong><br>
+                Real drivers tap <strong>"⚠️ Report Flood"</strong>, upload a street photo. Our Canvas scanner + AWS Rekognition AI + Open-Meteo Rain Radar verify it, then the hazard is dropped and other vehicles get auto-rerouted.
+            </div>
+
+            <div style="background: rgba(245, 158, 11, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 12px; border-left: 3px solid #f59e0b;">
+                <strong style="color: #f59e0b;">⚡ God Mode (For Judges Only):</strong><br>
+                Since you are testing from a desk (not standing in a real flood), turn ON <strong>⚡ God Mode</strong> → double-click anywhere on the map/route to instantly simulate a verified flood and watch live vehicle-aware rerouting!
             </div>
 
             <div style="background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00b4d8;">
-                <strong style="color: #38bdf8;">2. 🛵 🚗 🚙 Vehicle Clearance:</strong><br>
-                Switch between <strong>Bike (15cm)</strong>, <strong>Sedan (30cm)</strong>, and <strong>SUV (45cm)</strong> to filter water depth limits.
+                <strong style="color: #38bdf8;">🛵 🚗 🚙 Vehicle Clearance Engine:</strong><br>
+                Switch Bike (15cm) / Sedan (30cm) / SUV (45cm). Router blocks any water deeper than your vehicle's exhaust height.
             </div>
+
+            <div style="background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00b4d8;">
+                <strong style="color: #38bdf8;">🔥 Heatwave Mode + 🎯 Recenter:</strong><br>
+                Heatwave fetches live drinking water taps (Overpass API). Bullseye button flies map back to your GPS.
+            </div>
+
+        </div>
+
+        <button onclick="toggleGuideModal()" style="width: 100%; margin-top: 15px; background: #38bdf8; color: #0f172a; border: none; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer;">
+            Got it! Start Testing 🚀
+        </button>
+    </div>
+</div>
 
             <div style="background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00b4d8;">
                 <strong style="color: #38bdf8;">3. 📸 Anti-Fake Photo Scanner:</strong><br>
