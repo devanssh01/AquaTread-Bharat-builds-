@@ -998,14 +998,73 @@
             setTimeout(() => queryLocalAndPrivatePlaces(query, 'end'), 50);
         }
 
+                // 🎯 SMART RECENTER WITH DESKTOP PANEL OFFSET & FORWARD ROUTE FOCUS
+        function flyToWithPanelOffset(latLng, zoom = 16) {
+            if (!map) return;
+            let targetZoom = zoom || map.getZoom() || 16;
+            
+            // On Desktop (width >= 768px), offset center by 170px so pointer lands in visual center of open map
+            if (window.innerWidth >= 768) {
+                const targetPoint = map.project(latLng, targetZoom);
+                const offsetPoint = L.point(targetPoint.x - 170, targetPoint.y);
+                const centerLatLng = map.unproject(offsetPoint, targetZoom);
+                map.flyTo(centerLatLng, targetZoom, { animate: true, duration: 1 });
+            } else {
+                map.flyTo(latLng, targetZoom, { animate: true, duration: 1 });
+            }
+        }
+
         function recenterToUser() {
             if (!map) return;
-            if (gpsPos) {
-                map.flyTo(gpsPos, 16, { animate: true, duration: 1 });
-                if (startMarker && !isManualStart) startMarker.setLatLng(gpsPos);
-                speakCue("Centering on your location.");
+            
+            let target = startPos || gpsPos;
+            
+            // Fix 2000km MP bug: If start is still stuck at India Default [20.5937, 78.9629], reset to live GPS
+            if (!target || (Math.abs(target[0] - 20.5937) < 0.1 && Math.abs(target[1] - 78.9629) < 0.1)) {
+                if (gpsPos) {
+                    target = gpsPos;
+                    startPos = gpsPos;
+                }
+            }
+
+            if (!target) {
+                if ('geolocation' in navigator) {
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                            gpsPos = [pos.coords.latitude, pos.coords.longitude];
+                            startPos = gpsPos;
+                            if (startMarker) startMarker.setLatLng(gpsPos);
+                            flyToWithPanelOffset(gpsPos, 16);
+                            speakCue("Centering on your location.");
+                        },
+                        () => alert("Current location unavailable. Please allow GPS access."),
+                        { enableHighAccuracy: true, timeout: 8000 }
+                    );
+                }
                 return;
             }
+
+            // Move marker to exact location
+            if (startMarker) startMarker.setLatLng(target);
+            
+            // 🎯 SMART FORWARD ROUTE VIEW: If a route is active, show pointer + upcoming route ahead!
+            if (activeRouteCoords && activeRouteCoords.length > 5) {
+                let forwardSegment = activeRouteCoords.slice(0, Math.min(25, activeRouteCoords.length)).map(c => [c[1], c[0]]);
+                let bounds = L.latLngBounds(forwardSegment);
+                
+                let paddingLeft = window.innerWidth >= 768 ? 390 : 30;
+                map.flyToBounds(bounds, {
+                    paddingTopLeft: [paddingLeft, 60],
+                    paddingBottomRight: [50, 50],
+                    maxZoom: 17,
+                    duration: 1
+                });
+            } else {
+                flyToWithPanelOffset(target, 16);
+            }
+            
+            speakCue("Centering on your location.");
+        }
             if ('geolocation' in navigator) {
                 navigator.geolocation.getCurrentPosition(
                     (pos) => {
