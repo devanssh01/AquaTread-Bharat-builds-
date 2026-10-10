@@ -249,75 +249,52 @@
         <button class="chip chip-install" id="pwa-install-btn" style="display:none;" onclick="triggerPWAInstall()">📲 Install</button>
         <div class="chip" onclick="openModal('about-modal')">ℹ️ About</div>
     </div>
+
+    <!-- CLEAN & CORRECT JUDGE GUIDE MODAL -->
     <div id="guideModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(11, 19, 43, 0.85); z-index: 9999; backdrop-filter: blur(5px); justify-content: center; align-items: center;">
-    <div style="background: #1c2541; border: 1px solid #38bdf8; border-radius: 16px; width: 90%; max-width: 520px; padding: 24px; color: #f8fafc; box-shadow: 0 20px 50px rgba(0,0,0,0.6); max-height: 85vh; overflow-y: auto; font-family: sans-serif;">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; margin-bottom: 16px;">
-            <h3 style="margin: 0; color: #38bdf8; font-size: 18px;">🏆 How to Test AquaTread</h3>
-            <span onclick="toggleGuideModal()" style="cursor: pointer; font-size: 22px; color: #94a3b8;">&times;</span>
+        <div style="background: #1c2541; border: 1px solid #38bdf8; border-radius: 16px; width: 90%; max-width: 520px; padding: 24px; color: #f8fafc; box-shadow: 0 20px 50px rgba(0,0,0,0.6); max-height: 85vh; overflow-y: auto; font-family: sans-serif;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; margin-bottom: 16px;">
+                <h3 style="margin: 0; color: #38bdf8; font-size: 18px;">🏆 How to Test AquaTread</h3>
+                <span onclick="toggleGuideModal()" style="cursor: pointer; font-size: 22px; color: #94a3b8;">&times;</span>
+            </div>
+
+            <div style="font-size: 13px; line-height: 1.6; color: #cbd5e1;">
+                <div style="background: rgba(16, 185, 129, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #10b981;">
+                    <strong style="color: #10b981;">🌍 Normal Mode (Real Users):</strong><br>
+                    Drivers tap <strong>"⚠️ Report Flood"</strong>. Canvas scanner + AWS Rekognition AI + Live Rain Radar verify it → hazard drops → vehicles auto-reroute.
+                </div>
+
+                <div style="background: rgba(245, 158, 11, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #f59e0b;">
+                    <strong style="color: #f59e0b;">⚡ God Mode (For Judges):</strong><br>
+                    Turn ON <strong>⚡ God Mode</strong> → double-click map/route to drop a simulated flood instantly and watch live vehicle-aware rerouting.
+                </div>
+
+                <div style="background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00b4d8;">
+                    <strong style="color: #38bdf8;">🛵🚗🚙 Vehicle Clearance:</strong> Switch Bike (15cm) / Sedan (30cm) / SUV (45cm). Router blocks water deeper than your exhaust height.
+                </div>
+
+                <div style="background: rgba(239, 68, 68, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #ef4444;">
+                    <strong style="color: #f87171;">🚦 Live Traffic Overlay:</strong> Transparent Google traffic tiles load on a dedicated pane (z-index 465) mapping speed vectors cleanly inside the blue route.
+                </div>
+
+                <div style="background: rgba(168, 85, 247, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #a855f7;">
+                    <strong style="color: #c084fc;">🧭 Compass & 🔊 Voice Cues (Native PWA):</strong><br>
+                    <strong>Compass:</strong> Binds Device Orientation API.<br>
+                    <strong>Voice:</strong> Web Speech API announces contextual detours.
+                </div>
+
+                <div style="background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00b4d8;">
+                    <strong style="color: #38bdf8;">🔥 Heatwave Help & 🎯 Recenter:</strong><br>
+                    <strong>Heatwave:</strong> Fetches live OSM drinking water taps.<br>
+                    <strong>🎯 Bullseye:</strong> Flies map directly back to your GPS location with smart offset.
+                </div>
+            </div>
+
+            <button onclick="toggleGuideModal()" style="width: 100%; margin-top: 15px; background: #38bdf8; color: #0f172a; border: none; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer;">
+                Got it! Start Testing 🚀
+            </button>
         </div>
-
-        <div style="font-size: 13px; line-height: 1.6; color: #cbd5e1;">
-
-            <!-- NORMAL MODE -->
-            <div style="background: rgba(16, 185, 129, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #10b981;">
-                <strong style="color: #10b981;">🌍 Normal Mode (Real Users):</strong><br>
-                Drivers tap <strong>"⚠️ Report Flood"</strong>. Canvas scanner + AWS Rekognition AI + Live Rain Radar verify it → hazard drops → vehicles auto-reroute.
-            </div>
-
-            <!-- GOD MODE -->
-            <div style="background: rgba(245, 158, 11, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #f59e0b;">
-                <strong style="color: #f59e0b;">⚡ God Mode (For Judges):</strong><br>
-                Turn ON <strong>⚡ God Mode</strong> → double-click map/route to drop a simulated flood instantly and watch live vehicle-aware rerouting.
-            </div>
-
-            <!-- VEHICLE CLEARANCE -->
-            <div style="background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00b4d8;">
-                <strong style="color: #38bdf8;">🛵🚗🚙 Vehicle Clearance:</strong> Switch Bike (15cm) / Sedan (30cm) / SUV (45cm). Router blocks water deeper than your exhaust height.
-            </div>
-
-            <!-- TRAFFIC MODE -->
-            <div style="background: rgba(239, 68, 68, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #ef4444;">
-                <strong style="color: #f87171;">🚦 Live Traffic Overlay:</strong> Transparent Google traffic tiles load on a dedicated pane (z-index 465) perfectly mapping speed vectors inside the blue route.
-            </div>
-
-            <!-- SENSORS: VOICE & COMPASS -->
-            <div style="background: rgba(168, 85, 247, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #a855f7;">
-                <strong style="color: #c084fc;">🧭 Compass & 🔊 Voice Cues (Native PWA):</strong><br>
-                <strong>Compass:</strong> Binds Device Orientation API for live heading.<br>
-                <strong>Voice:</strong> Web Speech API announces contextual detours.
-            </div>
-
-            <!-- HEATWAVE & RECENTER -->
-            <div style="background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00b4d8;">
-                <strong style="color: #38bdf8;">🔥 Heatwave Help & 🎯 Recenter:</strong><br>
-                <strong>Heatwave:</strong> Fetches live OSM drinking water taps (Overpass API).<br>
-                <strong>🎯 Bullseye:</strong> Flies map directly back to your GPS location.
-            </div>
-
-        </div>
-
-        <button onclick="toggleGuideModal()" style="width: 100%; margin-top: 15px; background: #38bdf8; color: #0f172a; border: none; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer;">
-            Got it! Start Testing 🚀
-        </button>
     </div>
-</div>
-
-            <div style="background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00b4d8;">
-                <strong style="color: #38bdf8;">3. 📸 Anti-Fake Photo Scanner:</strong><br>
-                Click <strong>"📸 Report Flood"</strong> to run Canvas CV pixel scan + Open-Meteo Rain Radar + AWS Rekognition AI!
-            </div>
-
-            <div style="background: rgba(0, 180, 216, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #00b4d8;">
-                <strong style="color: #38bdf8;">4. 🔥 Heatwave Mode:</strong><br>
-                Toggle <strong>"Heatwave Help"</strong> to fetch real-time OSM drinking water points via Overpass API.
-            </div>
-        </div>
-
-        <button onclick="toggleGuideModal()" style="width: 100%; margin-top: 15px; background: #38bdf8; color: #0f172a; border: none; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer;">
-            Got it! Start Testing 🚀
-        </button>
-    </div>
-</div>
 
     <div class="bottom-sheet">
         <div class="sheet-content-wrapper">
@@ -839,6 +816,15 @@
             const ex = item.extratags || {};
             const addr = item.address || {};
 
+            // 🎓 NEW: Education tags for Colleges, Schools, Universities
+            if (typ.includes('college') || typ.includes('university') || typ.includes('school') || cls === 'education' || addr.university) {
+                return { icon: '🎓', tag: 'Education', rank: 2 };
+            }
+            // 🌳 NEW: Park tags for Local Parks, Leisure spaces
+            if (typ.includes('park') || cls === 'leisure' || typ.includes('garden')) {
+                return { icon: '🌳', tag: 'Park', rank: 3 };
+            }
+
             if (ex.shop || cls === 'shop' || typ.includes('supermarket') || typ.includes('convenience') || typ.includes('mall')) {
                 return { icon: '🏬', tag: 'Shop', rank: 1 };
             }
@@ -998,12 +984,11 @@
             setTimeout(() => queryLocalAndPrivatePlaces(query, 'end'), 50);
         }
 
-                // 🎯 SMART RECENTER WITH DESKTOP PANEL OFFSET & FORWARD ROUTE FOCUS
+        // 🎯 SMART RECENTER WITH DESKTOP PANEL OFFSET & FORWARD ROUTE FOCUS
         function flyToWithPanelOffset(latLng, zoom = 16) {
             if (!map) return;
             let targetZoom = zoom || map.getZoom() || 16;
             
-            // On Desktop (width >= 768px), offset center by 170px so pointer lands in visual center of open map
             if (window.innerWidth >= 768) {
                 const targetPoint = map.project(latLng, targetZoom);
                 const offsetPoint = L.point(targetPoint.x - 170, targetPoint.y);
@@ -1019,7 +1004,6 @@
             
             let target = startPos || gpsPos;
             
-            // Fix 2000km MP bug: If start is still stuck at India Default [20.5937, 78.9629], reset to live GPS
             if (!target || (Math.abs(target[0] - 20.5937) < 0.1 && Math.abs(target[1] - 78.9629) < 0.1)) {
                 if (gpsPos) {
                     target = gpsPos;
@@ -1044,10 +1028,8 @@
                 return;
             }
 
-            // Move marker to exact location
             if (startMarker) startMarker.setLatLng(target);
             
-            // 🎯 SMART FORWARD ROUTE VIEW: If a route is active, show pointer + upcoming route ahead!
             if (activeRouteCoords && activeRouteCoords.length > 5) {
                 let forwardSegment = activeRouteCoords.slice(0, Math.min(25, activeRouteCoords.length)).map(c => [c[1], c[0]]);
                 let bounds = L.latLngBounds(forwardSegment);
@@ -1064,20 +1046,6 @@
             }
             
             speakCue("Centering on your location.");
-        }
-            if ('geolocation' in navigator) {
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                        gpsPos = [pos.coords.latitude, pos.coords.longitude];
-                        if (!isManualStart) startPos = gpsPos;
-                        if (startMarker) startMarker.setLatLng(gpsPos);
-                        map.flyTo(gpsPos, 16, { animate: true, duration: 1 });
-                        speakCue("Centering on your location.");
-                    },
-                    () => alert("Current location unavailable. Please allow GPS access."),
-                    { enableHighAccuracy: true, timeout: 8000 }
-                );
-            }
         }
 
         let deferredPWAInstallPrompt = null;
@@ -1187,6 +1155,7 @@
                 speakCue(cue);
             }
         }
+
         function toggleGodMode() {
             isGodMode = !isGodMode;
             document.getElementById('judge-chip').classList.toggle('active');
@@ -1211,13 +1180,12 @@
             }
         }
 
-
         function toggleGuideModal() {
-                const modal = document.getElementById('guideModal');
-                if (!modal) return;
-                if (modal.style.display === 'none' || modal.style.display === '') {
+            const modal = document.getElementById('guideModal');
+            if (!modal) return;
+            if (modal.style.display === 'none' || modal.style.display === '') {
                 modal.style.display = 'flex';
-                } else {
+            } else {
                 modal.style.display = 'none';
             }
         }
@@ -1748,8 +1716,8 @@
                         let brightDryPixels = 0;
                         let algaeSludgePixels = 0;
                         let blackDrainPixels = 0;
-                        let fabricBluePixels = 0; // 🔥 Rejects Saturated Blue Shirts / Bags / Cloth
-                        let asphaltRoadPixels = 0;  // 🔥 Requires Dark Wet Street Texture
+                        let fabricBluePixels = 0;
+                        let asphaltRoadPixels = 0;
                         let uiRedPixels = 0;
                         let uiMapBgPixels = 0;
                         let uiBluePixels = 0;
@@ -1759,28 +1727,15 @@
                             const brightness = (r + g + b) / 3;
                             totalBrightness += brightness;
 
-                            // Skin Tone Detection
                             if (r > 60 && g > 35 && b > 20 && r > g && g >= b && (r - g) > 10 && (r - b) > 20) skinPixels++;
-                            
-                            // Dry/Bright Surfaces
                             if (brightness > 140 || (r > 150 && g > 140)) brightDryPixels++;
-                            
-                            // 🔥 Fabric/Cloth/Bag Saturated Blue Check (Pure Blue, NOT murky street water)
                             if (b - r > 20 && b - g > 12) fabricBluePixels++;
-
-                            // 🔥 Asphalt/Street Road Texture (Dark neutral grey tones)
                             if (Math.abs(r - g) <= 15 && Math.abs(g - b) <= 15 && brightness >= 25 && brightness <= 130) asphaltRoadPixels++;
-
-                            // Real Murky Flood Water (Grey-brown asphalt reflections)
                             if (Math.abs(r - g) <= 18 && Math.abs(g - b) <= 18 && brightness >= 35 && brightness <= 135 && !(b - r > 20)) {
                                 murkyWaterPixels++;
                             }
-
-                            // Algae / Sewage / Drains
                             if (g > 40 && g > r + 12 && g > b + 8 && r < 140) algaeSludgePixels++;
                             if (r < 22 && g < 22 && b < 22) blackDrainPixels++;
-
-                            // UI Screenshot Checks
                             if (r > 180 && g < 80 && b < 80) uiRedPixels++;
                             if (r > 240 && g > 240 && b > 240) uiMapBgPixels++;
                             if (b > 180 && r < 80 && g < 120) uiBluePixels++;
@@ -1797,37 +1752,31 @@
                         const uiMapBgRatio = uiMapBgPixels / totalPixels;
                         const uiBlueRatio = uiBluePixels / totalPixels;
 
-                        // UI Screenshots
                         if ((uiRedRatio > 0.02 || uiMapBgRatio > 0.25 || uiBlueRatio > 0.04) && !isGodMode) {
                             resolve({ isFlooded: false, isSynthetic: true, confidence: 99.5, label: "That looks like a map screenshot" });
                             return;
                         }
 
-                        // 🔥 Fabric / Bag / Clothing Rejection
                         if (fabricRatio > 0.08 && !isGodMode) {
                             resolve({ isFlooded: false, isSynthetic: false, confidence: 98.4, label: "Looks like clothing, fabric, or a bag — please snap the street" });
                             return;
                         }
 
-                        // Sewage / Drains
                         if (sewageRatio > 0.14 && !isGodMode) {
                             resolve({ isFlooded: false, isSynthetic: false, confidence: 97.5, label: "Looks like a drain, not a flooded road" });
                             return;
                         }
 
-                        // Skin / Indoors
                         if (skinRatio > 0.12 && !isGodMode) {
                             resolve({ isFlooded: false, isSynthetic: false, confidence: 98.2, label: "We can see a person/indoor surface — please snap the road" });
                             return;
                         }
 
-                        // Dry Surface Check
                         if ((dryRatio > 0.35 || avgBrightness > 145) && waterRatio < 0.25) {
                             resolve({ isFlooded: false, isSynthetic: false, confidence: 95.2, label: "Road looks dry to us" });
                             return;
                         }
 
-                        // Passed Valid Street Water Verification
                         if (waterRatio >= 0.20 && skinRatio < 0.10 && sewageRatio < 0.10 && fabricRatio < 0.08) {
                             resolve({ isFlooded: true, isSynthetic: false, confidence: 97.4, label: "Flooded road confirmed" });
                         } else {
@@ -1902,7 +1851,6 @@
                         if (weatherData.hourly.precipitation.slice(-2).some(p => p > 0)) rainFound = true;
                     }
 
-                    // 🔥 Professional Weather Wording
                     let weatherText = rainFound ? "Active rainfall verified at location" : "Radar: Rain paused recently, GPS & photo verified";
 
                     statusEl.style.background = "rgba(16, 185, 129, 0.25)";
