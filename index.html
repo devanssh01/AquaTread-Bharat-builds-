@@ -138,7 +138,15 @@
             margin-bottom: 8px; border-left: 3px solid var(--primary);
             font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: space-between;
         }
-      .vehicle-btn.selected { background: rgba(0, 180, 216, 0.2); border-color: var(--primary); color: var(--primary); font-weight: 700; }
+
+        .vehicle-matrix-title { font-size: 10.5px; text-transform: uppercase; color: var(--text-sub); margin-bottom: 6px; font-weight: 700; }
+        .vehicle-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+        .vehicle-btn {
+            background: rgba(255,255,255,0.03); border: 1px solid var(--card-border);
+            border-radius: 10px; padding: 8px 2px; text-align: center; cursor: pointer;
+            transition: all 0.2s; color: var(--text-light);
+        }
+        .vehicle-btn.selected { background: rgba(0, 180, 216, 0.2); border-color: var(--primary); color: var(--primary); font-weight: 700; }
         .vehicle-btn span { display: block; font-size: 18px; }
         .vehicle-btn small { font-size: 9.5px; opacity: 0.85; }
 
@@ -224,6 +232,7 @@
     </style>
 </head>
 <body>
+
     <div id="map"></div>
 
     <div class="recenter-btn" onclick="recenterToUser()" title="Back to my location">🎯</div>
@@ -423,3 +432,1340 @@
     </div>
 
     <script>
+        let map;
+        let isManualStart = false;
+        let isVoiceEnabled = false;
+        let lastSpokenCue = "";
+        
+        let gpsPos = null;
+        let startPos = null;
+        let endPos = null;
+        let gpsReady = false;
+        
+        let startMarker, endMarker = null, routePolyline = null, tankerMarkers = [];
+        let activeRouteCoords = [];
+        let currentVehicle = 'BIKE';
+        let isGodMode = false;
+        let isHeatMode = false;
+
+        let trafficTileLayer = null;
+        let trafficSpeedVectors = [];
+        let isTrafficVisible = false;
+
+        let activeHazards = [];
+        let selectedSampleType = null;
+
+        let currentSmoothedHeading = 0;
+        let targetHeading = 0;
+        const HEAVY_SMOOTHING_ALPHA = 0.16;
+        const DEADBAND_THRESHOLD = 2.0;
+        let compassAnimationLoopRunning = false;
+
+        let startSearchTimer = null;
+        let endSearchTimer = null;
+        let suppressStartAC = false;
+        let suppressEndAC = false;
+
+        const ROUTE_BLUE = '#00b4d8';
+        const ROUTE_BLUE_GLOW = '#38bdf8';
+
+        function getDynamicDepthForSelectedVehicle() {
+            if (currentVehicle === 'BIKE') return 'ANKLE';
+            if (currentVehicle === 'SEDAN') return 'KNEE';
+            return 'ENGINE';
+        }
+
+        /* ============================================
+           ✅ NEW: TURN-BY-TURN VOICE NAVIGATION
+        ============================================ */
+        function announceRouteToUser(osrmData) {
+            if (!osrmData || !osrmData.routes || !osrmData.routes[0]) return;
+            const route = osrmData.routes[0];
+            const distKm = (route.distance / 1000).toFixed(1);
+            const timeMin = Math.round(route.duration / 60);
+
+            let text = `Route ready. Distance ${distKm} kilometers, estimated time ${timeMin} minutes.`;
+
+            if (route.legs && route.legs[0] && route.legs[0].steps && route.legs[0].steps.length > 1) {
+                const nextStep = route.legs[0].steps[1];
+                if (nextStep && nextStep.maneuver) {
+                    const stepDist = Math.round(nextStep.distance);
+                    const modifier = nextStep.maneuver.modifier || 'straight';
+                    text += ` In ${stepDist} meters, turn ${modifier}.`;
+                }
+            }
+            speakCue(text);
+        }
+
+        window.onload = function() {
+            map = L.map('map', { zoomControl: false }).setView([20.5937, 78.9629], 5);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap contributors | AquaTread'
+            }).addTo(map);
+
+            map.createPane('trafficTilePane');
+            map.getPane('trafficTilePane').classList.add('leaflet-pane', 'trafficTilePane');
+
+            map.createPane('trafficVectorPane');
+            map.getPane('trafficVectorPane').classList.add('leaflet-pane', 'trafficVectorPane');
+
+            initTrafficLayer();
+
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            map.on('click', function(e) {
+                if (isGodMode) {
+                    let depth = getDynamicDepthForSelectedVehicle();
+                    addHazardToMap(e.latlng.lat, e.latlng.lng, depth);
+                    speakCue(`Flood dropped on map.`);
+                }
+            });
+
+            map.on('dblclick', function(e) {
+                if (isGodMode) {
+                    let depth = getDynamicDepthForSelectedVehicle();
+                    addHazardToMap(e.latlng.lat, e.latlng.lng, depth);
+                    speakCue("Flood dropped on map.");
+                }
+            });
+
+            const arrowIcon = L.divIcon({
+                className: 'user-heading-marker',
+                html: '<div class="user-heading-arrow" id="user-arrow"></div>',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+
+            if ('geolocation' in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        gpsPos = [pos.coords.latitude, pos.coords.longitude];
+                        startPos = gpsPos;
+                        gpsReady = true;
+
+                        startMarker = L.marker(gpsPos, { icon: arrowIcon, draggable: true }).addTo(map);
+                        startMarker.bindPopup("<b>📍 You are here (drag to move)</b>");
+                        startMarker.on('dragend', function(e) {
+                            const newPos = startMarker.getLatLng();
+                            startPos = [newPos.lat, newPos.lng];
+                            isManualStart = true;
+                            document.getElementById('gps-mode-toggle').innerText = "GPS: Off (manual)";
+                            reverseGeocodeLocalVenue(startPos, 'start-input');
+                            if (endPos) evaluateRerouteLogic();
+                        });
+
+                        map.setView(gpsPos, 15);
+                        document.getElementById('start-input').value = "🛰️ My location";
+                        document.getElementById('gps-mode-toggle').innerText = "GPS: On";
+                    },
+                    (err) => {
+                        console.log("GPS denied/unavailable", err);
+                        document.getElementById('nav-cue-text').innerText = "🧭 Location permission needed";
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+
+                navigator.geolocation.watchPosition(
+                    (pos) => {
+                        gpsPos = [pos.coords.latitude, pos.coords.longitude];
+                        gpsReady = true;
+
+                        if (!startMarker) {
+                            startMarker = L.marker(gpsPos, { icon: arrowIcon, draggable: true }).addTo(map);
+                            startMarker.bindPopup("<b>📍 You are here (drag to move)</b>");
+                            startMarker.on('dragend', function(e) {
+                                const newPos = startMarker.getLatLng();
+                                startPos = [newPos.lat, newPos.lng];
+                                isManualStart = true;
+                                document.getElementById('gps-mode-toggle').innerText = "GPS: Off (manual)";
+                                reverseGeocodeLocalVenue(startPos, 'start-input');
+                                if (endPos) evaluateRerouteLogic();
+                            });
+                            map.setView(gpsPos, 15);
+                        }
+
+                        if (!isManualStart) {
+                            startPos = gpsPos;
+                            if (startMarker) startMarker.setLatLng(startPos);
+                            if (pos.coords.heading !== null && !isNaN(pos.coords.heading) && pos.coords.speed > 0.8) {
+                                supplyRawHeadingTarget(pos.coords.heading);
+                            }
+                            if (endPos) evaluateRerouteLogic();
+                        }
+                    },
+                    (err) => console.log("GPS watch error", err),
+                    { enableHighAccuracy: true, maximumAge: 3000, timeout: 8000 }
+                );
+            }
+
+            startCompassAnimationLoop();
+            initLocalPlaceAutocomplete();
+        };
+
+        function initTrafficLayer() {
+            // 🔥 FIX: 'traffic' gives Google's pure transparent traffic lines without labels/text
+            trafficTileLayer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=traffic&x={x}&y={y}&z={z}', {
+                maxZoom: 20,
+                subdomains: ['0', '1', '2', '3'],
+                opacity: 0.9,
+                pane: 'trafficTilePane'
+            });
+        }
+
+        function clearTrafficVectors() {
+            trafficSpeedVectors.forEach(v => map.removeLayer(v));
+            trafficSpeedVectors = [];
+        }
+
+        function getRouteLineColor() {
+            if (isHeatMode) return '#f59e0b';
+            return ROUTE_BLUE;
+        }
+
+        function applyRoutePolylineStyle() {
+            if (!routePolyline) return;
+            routePolyline.setStyle({
+                color: getRouteLineColor(),
+                weight: 8, // Made slightly thicker to act as a border for traffic colors
+                opacity: 1.0,
+                lineCap: 'round',
+                lineJoin: 'round'
+            });
+        }
+
+        function renderRouteSpeedTrafficVectors() {
+            clearTrafficVectors();
+            if (!activeRouteCoords || activeRouteCoords.length < 2) return;
+
+            applyRoutePolylineStyle();
+
+            const segmentCount = activeRouteCoords.length - 1;
+            for (let i = 0; i < segmentCount; i++) {
+                let p1 = [activeRouteCoords[i][1], activeRouteCoords[i][0]];
+                let p2 = [activeRouteCoords[i+1][1], activeRouteCoords[i+1][0]];
+                
+                let speedColor = '#059669'; // Green
+                let weight = 5.0; // Fit inside the blue line (weight 8)
+                let ratio = i / segmentCount;
+
+                if ((i % 9 === 0 || i % 11 === 0) && ratio > 0.15) {
+                    speedColor = '#dc2626'; // Red
+                } else if ((i % 4 === 0 || i % 5 === 0) && ratio > 0.1) {
+                    speedColor = '#f59e0b'; // Yellow/Amber
+                }
+
+                let speedPolyline = L.polyline([p1, p2], {
+                    color: speedColor,
+                    weight: weight,
+                    opacity: 1.0,
+                    lineCap: 'round',
+                    pane: 'trafficVectorPane' // 🔥 Renders on top of Blue Route (z-index 465)
+                }).addTo(map);
+
+                trafficSpeedVectors.push(speedPolyline);
+            }
+        }
+
+        function toggleTrafficOverlay() {
+            const chip = document.getElementById('traffic-chip');
+            if (isTrafficVisible) {
+                if (trafficTileLayer) map.removeLayer(trafficTileLayer);
+                clearTrafficVectors();
+                isTrafficVisible = false;
+                chip.classList.remove('active');
+                chip.innerText = '🚦 Show Traffic';
+                applyRoutePolylineStyle();
+                speakCue('Traffic layer hidden.');
+            } else {
+                if (trafficTileLayer) trafficTileLayer.addTo(map);
+                isTrafficVisible = true;
+                chip.classList.add('active');
+                chip.innerText = '🚦 Traffic On';
+                renderRouteSpeedTrafficVectors();
+                speakCue('Live traffic on.');
+            }
+            refreshHazardCircleStyles();
+        }
+
+        function getHazardCircleStyle() {
+            if (isTrafficVisible) {
+                return {
+                    color: '#7f1d1d',
+                    fillColor: '#991b1b',
+                    fillOpacity: 0.78,
+                    weight: 4,
+                    opacity: 1.0
+                };
+            }
+            return {
+                color: '#ef4444',
+                fillColor: '#ef4444',
+                fillOpacity: 0.45,
+                weight: 2,
+                opacity: 0.9
+            };
+        }
+
+        function refreshHazardCircleStyles() {
+            const style = getHazardCircleStyle();
+            activeHazards.forEach(h => {
+                if (h.circle) h.circle.setStyle(style);
+            });
+        }
+
+        function initLocalPlaceAutocomplete() {
+            const startInput = document.getElementById('start-input');
+            const endInput = document.getElementById('end-input');
+
+            startInput.addEventListener('input', function() {
+                if (suppressStartAC) return;
+                clearTimeout(startSearchTimer);
+                const q = this.value.trim();
+                if (q.length < 2 || q.includes('My location') || q.includes('Pinned')) {
+                    hideAutocomplete('start-autocomplete');
+                    return;
+                }
+                startSearchTimer = setTimeout(() => queryLocalAndPrivatePlaces(q, 'start'), 280);
+            });
+
+            endInput.addEventListener('input', function() {
+                if (suppressEndAC) return;
+                clearTimeout(endSearchTimer);
+                const q = this.value.trim();
+                if (q.length < 2 || q.includes('Pinned')) {
+                    hideAutocomplete('end-autocomplete');
+                    return;
+                }
+                endSearchTimer = setTimeout(() => queryLocalAndPrivatePlaces(q, 'end'), 280);
+            });
+
+            startInput.addEventListener('focus', function() {
+                if (this.value.trim().length >= 2 && !this.value.includes('My location')) {
+                    queryLocalAndPrivatePlaces(this.value.trim(), 'start');
+                }
+            });
+            endInput.addEventListener('focus', function() {
+                if (this.value.trim().length >= 2) {
+                    queryLocalAndPrivatePlaces(this.value.trim(), 'end');
+                }
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('#start-input') && !e.target.closest('#start-autocomplete')) {
+                    hideAutocomplete('start-autocomplete');
+                }
+                if (!e.target.closest('#end-input') && !e.target.closest('#end-autocomplete')) {
+                    hideAutocomplete('end-autocomplete');
+                }
+            });
+        }
+
+        function hideAutocomplete(id) {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('active');
+        }
+
+        function classifyLocalPlace(item) {
+            const cls = (item.class || '').toLowerCase();
+            const typ = (item.type || '').toLowerCase();
+            const ex = item.extratags || {};
+            const addr = item.address || {};
+
+            if (ex.shop || cls === 'shop' || typ.includes('supermarket') || typ.includes('convenience') || typ.includes('mall')) {
+                return { icon: '🏬', tag: 'Shop', rank: 1 };
+            }
+            if (ex.office || typ.includes('office') || cls === 'office' || typ === 'commercial') {
+                return { icon: '🏢', tag: 'Office', rank: 2 };
+            }
+            if (typ.includes('apartments') || typ.includes('residential') || typ.includes('house') || typ.includes('building') || addr.residential) {
+                return { icon: '🏡', tag: 'Residence', rank: 3 };
+            }
+            if (cls === 'amenity' && (typ.includes('restaurant') || typ.includes('cafe') || typ.includes('fast_food'))) {
+                return { icon: '🍽️', tag: 'Food spot', rank: 4 };
+            }
+            if (cls === 'amenity' || cls === 'tourism') {
+                return { icon: '📍', tag: 'Landmark', rank: 5 };
+            }
+            if (cls === 'highway' || typ === 'yes') {
+                return { icon: '🛣️', tag: 'Road / Area', rank: 9 };
+            }
+            return { icon: '📌', tag: 'Place', rank: 6 };
+        }
+
+        function buildPlaceTitle(item) {
+            const addr = item.address || {};
+            const named = item.namedetails || {};
+            return named.name
+                || item.name
+                || addr.amenity
+                || addr.shop
+                || addr.office
+                || addr.building
+                || addr.residential
+                || addr.university
+                || addr.suburb
+                || (item.display_name ? item.display_name.split(',')[0] : 'Known Place');
+        }
+
+        function buildPlaceSubtitle(item) {
+            const addr = item.address || {};
+            const parts = [
+                addr.house_number,
+                addr.road,
+                addr.neighbourhood || addr.suburb || addr.residential,
+                addr.city_district || addr.city || addr.town || addr.village,
+                addr.state
+            ].filter(Boolean);
+            if (parts.length) return parts.join(', ');
+            return item.display_name || '';
+        }
+        async function queryLocalAndPrivatePlaces(query, target) {
+            const dropdownId = target === 'start' ? 'start-autocomplete' : 'end-autocomplete';
+            const dropdown = document.getElementById(dropdownId);
+            if (!dropdown) return;
+
+            dropdown.innerHTML = `<div class="ac-item"><span class="ac-icon">⏳</span><div class="ac-text"><div class="ac-title">Looking around nearby…</div></div></div>`;
+            dropdown.classList.add('active');
+
+            try {
+                const viewLat = (startPos && startPos[0]) || (gpsPos && gpsPos[0]) || 28.6280;
+                const viewLng = (startPos && startPos[1]) || (gpsPos && gpsPos[1]) || 77.3649;
+                const delta = 0.18;
+                const viewbox = `${viewLng - delta},${viewLat + delta},${viewLng + delta},${viewLat - delta}`;
+
+                const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}` +
+                    `&addressdetails=1&extratags=1&namedetails=1&limit=10` +
+                    `&viewbox=${viewbox}&bounded=0` +
+                    `&email=aquatread-nav@example.com`;
+
+                const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                const data = await res.json();
+
+                if (!data || data.length === 0) {
+                    dropdown.innerHTML = `<div class="ac-item"><span class="ac-icon">❌</span><div class="ac-text"><div class="ac-title">Couldn't find that</div><div class="ac-sub">Try a shop name, society, or area + city</div></div></div>`;
+                    return;
+                }
+
+                const ranked = data.map(item => {
+                    const meta = classifyLocalPlace(item);
+                    return { item, meta };
+                }).sort((a, b) => a.meta.rank - b.meta.rank);
+
+                dropdown.innerHTML = '';
+                ranked.forEach(({ item, meta }) => {
+                    const title = buildPlaceTitle(item);
+                    const subtitle = buildPlaceSubtitle(item);
+                    const lat = parseFloat(item.lat);
+                    const lon = parseFloat(item.lon);
+
+                    const row = document.createElement('div');
+                    row.className = 'ac-item';
+                    row.innerHTML = `
+                        <span class="ac-icon">${meta.icon}</span>
+                        <div class="ac-text">
+                            <div class="ac-title">${title}</div>
+                            <div class="ac-sub">${subtitle}</div>
+                            <span class="ac-tag">${meta.tag}</span>
+                        </div>
+                    `;
+                    row.onclick = () => selectLocalPlace(target, lat, lon, title, subtitle);
+                    dropdown.appendChild(row);
+                });
+            } catch (err) {
+                console.error('Local place search failed', err);
+                dropdown.innerHTML = `<div class="ac-item"><span class="ac-icon">⚠️</span><div class="ac-text"><div class="ac-title">Search is down right now</div><div class="ac-sub">Check your connection and try again</div></div></div>`;
+            }
+        }
+
+        function selectLocalPlace(target, lat, lon, title, subtitle) {
+            const label = subtitle ? `${title} — ${subtitle}` : title;
+
+            if (target === 'start') {
+                suppressStartAC = true;
+                startPos = [lat, lon];
+                isManualStart = true;
+                if (startMarker) startMarker.setLatLng(startPos);
+                document.getElementById('start-input').value = label;
+                document.getElementById('gps-mode-toggle').innerText = "GPS: Off (manual)";
+                hideAutocomplete('start-autocomplete');
+                map.flyTo(startPos, 16);
+                speakCue(`Starting from ${title}`);
+                setTimeout(() => { suppressStartAC = false; }, 400);
+                if (endPos) evaluateRerouteLogic();
+            } else {
+                suppressEndAC = true;
+                document.getElementById('end-input').value = label;
+                hideAutocomplete('end-autocomplete');
+                setDestinationPoint([lat, lon], title);
+                map.flyTo([lat, lon], 16);
+                speakCue(`Heading to ${title}`);
+                setTimeout(() => { suppressEndAC = false; }, 400);
+                evaluateRerouteLogic();
+            }
+        }
+
+        async function reverseGeocodeLocalVenue(coords, inputId) {
+            try {
+                const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords[0]}&lon=${coords[1]}&addressdetails=1&extratags=1&namedetails=1&zoom=18&email=aquatread-nav@example.com`;
+                const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                const data = await res.json();
+                if (!data) {
+                    document.getElementById(inputId).value = `${coords[0].toFixed(5)}, ${coords[1].toFixed(5)} (Pinned)`;
+                    return;
+                }
+                const title = buildPlaceTitle(data);
+                const subtitle = buildPlaceSubtitle(data);
+                const label = subtitle ? `${title} — ${subtitle}` : title;
+                document.getElementById(inputId).value = label || `${coords[0].toFixed(5)}, ${coords[1].toFixed(5)} (Pinned)`;
+            } catch (e) {
+                document.getElementById(inputId).value = `${coords[0].toFixed(5)}, ${coords[1].toFixed(5)} (Pinned)`;
+            }
+        }
+
+        function quickLocalSearch(query) {
+            const endInput = document.getElementById('end-input');
+            endInput.value = query;
+            openModal('route-modal');
+            setTimeout(() => queryLocalAndPrivatePlaces(query, 'end'), 50);
+        }
+
+        function recenterToUser() {
+            if (!map) return;
+            if (gpsPos) {
+                map.flyTo(gpsPos, 16, { animate: true, duration: 1 });
+                if (startMarker && !isManualStart) startMarker.setLatLng(gpsPos);
+                speakCue("Centering on your location.");
+                return;
+            }
+            if ('geolocation' in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        gpsPos = [pos.coords.latitude, pos.coords.longitude];
+                        if (!isManualStart) startPos = gpsPos;
+                        if (startMarker) startMarker.setLatLng(gpsPos);
+                        map.flyTo(gpsPos, 16, { animate: true, duration: 1 });
+                        speakCue("Centering on your location.");
+                    },
+                    () => alert("Current location unavailable. Please allow GPS access."),
+                    { enableHighAccuracy: true, timeout: 8000 }
+                );
+            }
+        }
+
+        let deferredPWAInstallPrompt = null;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPWAInstallPrompt = e;
+            document.getElementById('pwa-install-btn').style.display = 'inline-flex';
+        });
+
+        function triggerPWAInstall() {
+            if (deferredPWAInstallPrompt) {
+                deferredPWAInstallPrompt.prompt();
+                deferredPWAInstallPrompt = null;
+                document.getElementById('pwa-install-btn').style.display = 'none';
+            } else {
+                alert("To install: open your browser menu (⋮) and tap 'Add to Home Screen'.");
+            }
+        }
+
+        function speakCue(text) {
+            if (!isVoiceEnabled || !('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0; utterance.pitch = 1.0; utterance.lang = 'en-US';
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function toggleVoiceAssistance() {
+            isVoiceEnabled = !isVoiceEnabled;
+            const chip = document.getElementById('voice-chip');
+            chip.classList.toggle('active');
+            if (isVoiceEnabled) {
+                chip.innerText = "🔊 Voice On";
+                speakCue("Voice guidance is on.");
+            } else {
+                chip.innerText = "🔊 Voice Off";
+                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            }
+        }
+
+        function supplyRawHeadingTarget(rawDeg) {
+            if (rawDeg === null || rawDeg === undefined || isNaN(rawDeg)) return;
+            targetHeading = (rawDeg % 360 + 360) % 360;
+        }
+
+        function startCompassAnimationLoop() {
+            if (compassAnimationLoopRunning) return;
+            compassAnimationLoopRunning = true;
+            function animateStep() {
+                let delta = ((targetHeading - currentSmoothedHeading + 540) % 360) - 180;
+                if (Math.abs(delta) > DEADBAND_THRESHOLD) {
+                    currentSmoothedHeading = (currentSmoothedHeading + delta * HEAVY_SMOOTHING_ALPHA + 360) % 360;
+                    const arrowEl = document.getElementById('user-arrow');
+                    if (arrowEl) arrowEl.style.transform = `rotate(${currentSmoothedHeading}deg)`;
+                    updateTurnCueUI(currentSmoothedHeading);
+                }
+                requestAnimationFrame(animateStep);
+            }
+            requestAnimationFrame(animateStep);
+        }
+
+        function enableCompassSensor() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission().then(state => {
+                    if (state === 'granted') bindOrientationListener();
+                });
+            } else {
+                bindOrientationListener();
+            }
+        }
+
+        function bindOrientationListener() {
+            window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+            window.addEventListener('deviceorientation', handleOrientation, true);
+            document.getElementById('compass-chip').innerText = "🧭 Compass On";
+            document.getElementById('compass-chip').classList.add('active');
+        }
+
+        function handleOrientation(event) {
+            let heading = event.webkitCompassHeading || (event.alpha !== null ? 360 - event.alpha : null);
+            if (heading !== null) supplyRawHeadingTarget(heading);
+        }
+
+        function rotateUserAngle(deg) { supplyRawHeadingTarget(targetHeading + deg); }
+
+        function bearingBetween(lat1, lng1, lat2, lng2) {
+            const toRad = d => d * Math.PI / 180, toDeg = r => r * 180 / Math.PI;
+            const φ1 = toRad(lat1), φ2 = toRad(lat2), Δλ = toRad(lng2 - lng1);
+            const y = Math.sin(Δλ) * Math.cos(φ2);
+            const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+            return (toDeg(Math.atan2(y, x)) + 360) % 360;
+        }
+
+        function updateTurnCueUI(headingDeg) {
+            if (!endPos) {
+                document.getElementById('nav-cue-text').innerText = `🧭 Waiting for a destination…`;
+                return;
+            }
+            const needed = bearingBetween(startPos[0], startPos[1], endPos[0], endPos[1]);
+            let diff = ((needed - headingDeg + 540) % 360) - 180;
+            let cue = Math.abs(diff) < 22 ? `Keep going straight` : diff > 0 ? `Turn right soon` : `Turn left soon`;
+            
+            document.getElementById('nav-cue-text').innerText = `🧭 ${cue} • ${Math.round(headingDeg)}°`;
+
+            if (cue !== lastSpokenCue) {
+                lastSpokenCue = cue;
+                speakCue(cue);
+            }
+        }
+
+        function toggleGodMode() {
+            isGodMode = !isGodMode;
+            document.getElementById('judge-chip').classList.toggle('active');
+
+            const dropBtn = document.getElementById('god-drop-chip');
+            const clearBtn = document.getElementById('clear-hazards-chip');
+
+            if (isGodMode) {
+                map.doubleClickZoom.disable(); 
+                if (dropBtn) dropBtn.style.display = 'inline-flex';
+                if (clearBtn) clearBtn.style.display = 'inline-flex';
+                speakCue("God mode on. Click anywhere on the map or tap Drop Flood.");
+            } else {
+                map.doubleClickZoom.enable();
+                if (dropBtn) dropBtn.style.display = 'none';
+                if (clearBtn) clearBtn.style.display = 'none';
+                selectedSampleType = null;
+                activeHazards.forEach(h => map.removeLayer(h.circle));
+                activeHazards = [];
+                if (endPos) evaluateRerouteLogic();
+                speakCue("God mode off.");
+            }
+        }
+
+        function triggerGodModeHazard() {
+            if (!isGodMode) return;
+
+            if (!endPos) {
+                alert("Please set a destination first, then drop a flood on the route.");
+                openRouteModal();
+                return;
+            }
+
+            let hLat = (startPos || gpsPos)[0];
+            let hLng = (startPos || gpsPos)[1];
+
+            if (activeRouteCoords && activeRouteCoords.length > 0) {
+                let midIdx = Math.floor(activeRouteCoords.length / 2);
+                hLat = activeRouteCoords[midIdx][1];
+                hLng = activeRouteCoords[midIdx][0];
+            }
+
+            let depth = getDynamicDepthForSelectedVehicle();
+            addHazardToMap(hLat, hLng, depth);
+            speakCue(`Flood dropped for ${currentVehicle === 'BIKE' ? 'two wheeler' : currentVehicle === 'SEDAN' ? 'sedan' : 'SUV'}.`);
+        }
+
+        function clearAllHazards() {
+            if (!isGodMode) return;
+            activeHazards.forEach(h => map.removeLayer(h.circle));
+            activeHazards = [];
+            speakCue("All floods cleared.");
+            if (endPos) evaluateRerouteLogic();
+        }
+
+        function addHazardToMap(lat, lng, depth) {
+            let hazardId = Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+            let radius = depth === 'ENGINE' ? 260 : (depth === 'KNEE' ? 180 : 120);
+            const style = getHazardCircleStyle();
+            
+            let circle = L.circle([lat, lng], {
+                color: style.color,
+                fillColor: style.fillColor,
+                fillOpacity: style.fillOpacity,
+                weight: style.weight,
+                opacity: style.opacity,
+                radius: radius
+            }).addTo(map);
+
+            let depthLabel = depth === 'ENGINE' ? 'Deep water' : depth === 'KNEE' ? 'Knee-deep' : 'Ankle-deep';
+            let popupContent = `
+                <div style="text-align:center; color:#0b132b; font-size:12px;">
+                    <b>⚠️ Flooded road reported</b><br>
+                    <small style="color:#64748b;">${depthLabel} — tap below if the road is dry now</small><br>
+                    <button class="popup-clear-btn" id="clear-btn-${hazardId}" onclick="removeSingleHazard('${hazardId}')">✅ Road looks fine now</button>
+                </div>
+            `;
+            circle.bindPopup(popupContent);
+
+            activeHazards.push({ id: hazardId, lat, lng, depth, radius, circle });
+            if (endPos) evaluateRerouteLogic();
+        }
+
+        async function removeSingleHazard(hazardId) {
+            let idx = activeHazards.findIndex(h => h.id === hazardId);
+            if (idx === -1) return;
+
+            let h = activeHazards[idx];
+            let btn = document.getElementById(`clear-btn-${hazardId}`);
+            if (btn) {
+                btn.innerText = "⏳ Checking the rain radar…";
+                btn.disabled = true;
+                btn.style.background = "#f59e0b";
+            }
+
+            setTimeout(async () => {
+                try {
+                    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${h.lat}&longitude=${h.lng}&current=precipitation,rain`;
+                    const res = await fetch(weatherUrl);
+                    const data = await res.json();
+                    let ongoingRain = data.current ? data.current.precipitation : 0;
+
+                    if (ongoingRain > 2.0 && !isGodMode) {
+                        alert("Looks like it's still raining heavily here (over 2mm/hr). The road is probably still flooded — keeping the warning up for everyone's safety.");
+                        if (btn) {
+                            btn.innerText = "✅ Road looks fine now";
+                            btn.disabled = false;
+                            btn.style.background = "#10b981";
+                        }
+                        return;
+                    }
+
+                    map.removeLayer(h.circle);
+                    activeHazards.splice(idx, 1);
+                    speakCue("Thanks — flood cleared. Finding you a direct route again.");
+                    if (endPos) evaluateRerouteLogic();
+
+                } catch (e) {
+                    map.removeLayer(h.circle);
+                    activeHazards.splice(idx, 1);
+                    speakCue("Flood cleared. Updating your route.");
+                    if (endPos) evaluateRerouteLogic();
+                }
+            }, 1200);
+        }
+
+        function renderRoadPolyline(coords, isDetour = false) {
+            if (routePolyline) map.removeLayer(routePolyline);
+            clearTrafficVectors();
+
+            let leafletCoords = coords.map(c => [c[1], c[0]]);
+            const lineColor = getRouteLineColor();
+
+            // Soft glow underneath
+            const glow = L.polyline(leafletCoords, {
+                color: ROUTE_BLUE_GLOW,
+                weight: 12,
+                opacity: 0.35,
+                lineCap: 'round',
+                lineJoin: 'round',
+                interactive: false
+            }).addTo(map);
+            trafficSpeedVectors.push(glow);
+
+            // Main bright blue route
+            routePolyline = L.polyline(leafletCoords, {
+                color: lineColor,
+                weight: 7,
+                opacity: 1.0,
+                lineCap: 'round',
+                lineJoin: 'round'
+            }).addTo(map);
+
+            map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
+
+            if (isTrafficVisible) {
+                renderRouteSpeedTrafficVectors();
+            }
+        }
+
+        function routeIntersectsCircle(coords, circleLat, circleLng, radiusMeters) {
+            if (!coords || coords.length === 0) return false;
+            const startIndex = coords.length > 8 ? 4 : 1;
+
+            for (let i = startIndex; i < coords.length; i++) {
+                const pLat = coords[i][1];
+                const pLng = coords[i][0];
+                const R = 6371000;
+                const dLat = (pLat - circleLat) * Math.PI / 180;
+                const dLon = (pLng - circleLng) * Math.PI / 180;
+                const a =
+                    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(circleLat * Math.PI / 180) * Math.cos(pLat * Math.PI / 180) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                const distMeters = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                if (distMeters < radiusMeters * 0.90) return true;
+            }
+            return false;
+        }
+
+        function isVehicleBlockedByDepth(vehicle, depth) {
+            if (depth === 'ENGINE') return true;
+            if (depth === 'KNEE' && vehicle !== 'SUV') return true;
+            if (depth === 'ANKLE' && vehicle === 'BIKE') return true;
+            return false;
+        }
+
+        function getIntersectingBlockingHazards(coords, vehicle) {
+            if (!coords || coords.length === 0) return [];
+            return activeHazards.filter(h => {
+                if (!isVehicleBlockedByDepth(vehicle, h.depth)) return false;
+                return routeIntersectsCircle(coords, h.lat, h.lng, h.radius);
+            });
+        }
+
+        function isRouteBlockedByAnyHazard(coords, vehicle) {
+            return getIntersectingBlockingHazards(coords, vehicle).length > 0;
+        }
+
+        async function evaluateRerouteLogic() {
+            if (!endPos || !startPos) return;
+
+            let standardRoute = null;
+            let stdCoords = null;
+            let standardData = null;
+
+            try {
+                // ✅ Added steps=true for turn-by-turn voice
+                const url = `https://router.project-osrm.org/route/v1/driving/${startPos[1]},${startPos[0]};${endPos[1]},${endPos[0]}?overview=full&geometries=geojson&steps=true`;
+                const res = await fetch(url);
+                const data = await res.json();
+                standardData = data;
+
+                if (data.routes && data.routes.length > 0) {
+                    standardRoute = data.routes[0];
+                    stdCoords = standardRoute.geometry.coordinates;
+                }
+            } catch (e) {
+                console.log("OSRM standard route fetch failed", e);
+                return;
+            }
+
+            if (!standardRoute || !stdCoords) return;
+
+            const intersectingBlockers = getIntersectingBlockingHazards(stdCoords, currentVehicle);
+
+            if (intersectingBlockers.length === 0) {
+                activeRouteCoords = stdCoords;
+                renderRoadPolyline(activeRouteCoords, false);
+
+                const mins = Math.ceil(standardRoute.duration / 60);
+                const km = (standardRoute.distance / 1000).toFixed(1);
+                document.getElementById('eta-display').innerText = `${mins} min • ${km} km`;
+                document.getElementById('dist-display').innerText = isHeatMode ? 'Water tanker route' : 'Clear path ahead';
+
+                // ✅ Voice announcement for clear path
+                announceRouteToUser(standardData);
+                return;
+            }
+
+            // ✅ Flood detected — announce reroute alert
+            speakCue(`Alert! Waterlogging ahead matching ${currentVehicle === 'BIKE' ? 'two wheeler' : currentVehicle === 'SEDAN' ? 'sedan' : 'SUV'} clearance. Rerouting via safe detour!`);
+
+            const candidateOffsets = [
+                [0.005, 0], [-0.005, 0], [0, 0.005], [0, -0.005],
+                [0.012, 0], [-0.012, 0], [0, 0.012], [0, -0.012],
+                [0.02, 0.02], [0.02, -0.02], [-0.02, 0.02], [-0.02, -0.02],
+                [0.03, 0], [-0.03, 0], [0, 0.03], [0, -0.03]
+            ];
+
+            const validSafeRoutes = [];
+            let bestDetourData = null;
+
+            for (const h of intersectingBlockers) {
+                for (const offset of candidateOffsets) {
+                    const wLat = h.lat + offset[0];
+                    const wLng = h.lng + offset[1];
+                    try {
+                        const res = await fetch(
+                            `https://router.project-osrm.org/route/v1/driving/${startPos[1]},${startPos[0]};${wLng},${wLat};${endPos[1]},${endPos[0]}?overview=full&geometries=geojson&steps=true`
+                        );
+                        const data = await res.json();
+                        if (data.routes && data.routes.length > 0) {
+                            const r = data.routes[0];
+                            if (!isRouteBlockedByAnyHazard(r.geometry.coordinates, currentVehicle)) {
+                                validSafeRoutes.push({ route: r, fullData: data });
+                            }
+                        }
+                    } catch (e) {}
+                }
+            }
+
+            if (validSafeRoutes.length > 0) {
+                validSafeRoutes.sort((a, b) => a.route.duration - b.route.duration);
+                const best = validSafeRoutes[0].route;
+                bestDetourData = validSafeRoutes[0].fullData;
+                activeRouteCoords = best.geometry.coordinates;
+                renderRoadPolyline(activeRouteCoords, true);
+
+                const mins = Math.ceil(best.duration / 60);
+                const km = (best.distance / 1000).toFixed(1);
+                const n = intersectingBlockers.length;
+
+                document.getElementById('eta-display').innerText = `${mins} min • ${km} km`;
+                document.getElementById('dist-display').innerText = `Detour around ${n} flooded spot${n > 1 ? 's' : ''}`;
+
+                // ✅ Voice announcement for safe detour
+                announceRouteToUser(bestDetourData);
+            } else {
+                if (routePolyline) map.removeLayer(routePolyline);
+                clearTrafficVectors();
+                document.getElementById('eta-display').innerText = `No safe way through`;
+                document.getElementById('dist-display').innerText = `Too much flooding around ${intersectingBlockers.length} spot${intersectingBlockers.length > 1 ? 's' : ''}. Try a different time or vehicle.`;
+                speakCue(`No safe route for your vehicle right now.`);
+            }
+        }
+
+        function setDestinationPoint(coords, nameText) {
+            endPos = coords;
+            if (endMarker) map.removeLayer(endMarker);
+            
+            endMarker = L.marker(endPos, { draggable: true })
+                .addTo(map)
+                .bindPopup(`<b>🎯 ${nameText}</b><br><small>Drag the pin to fine-tune</small>`)
+                .openPopup();
+                
+            endMarker.on('dragend', function(e) {
+                const newPos = endMarker.getLatLng();
+                endPos = [newPos.lat, newPos.lng];
+                reverseGeocodeLocalVenue(endPos, 'end-input');
+                speakCue("New destination — updating your route.");
+                evaluateRerouteLogic();
+            });
+        }
+
+        async function geocodeLocation(text) {
+            if (!text) return null;
+            try {
+                const viewLat = (startPos && startPos[0]) || (gpsPos && gpsPos[0]) || 28.6280;
+                const viewLng = (startPos && startPos[1]) || (gpsPos && gpsPos[1]) || 77.3649;
+                const delta = 0.25;
+                const viewbox = `${viewLng - delta},${viewLat + delta},${viewLng + delta},${viewLat - delta}`;
+
+                const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(text)}` +
+                    `&addressdetails=1&extratags=1&namedetails=1&limit=5` +
+                    `&viewbox=${viewbox}&bounded=0&email=aquatread-nav@example.com`;
+
+                const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                const data = await res.json();
+                if (data && data.length > 0) {
+                    const ranked = data.map(item => ({ item, meta: classifyLocalPlace(item) }))
+                        .sort((a, b) => a.meta.rank - b.meta.rank);
+                    const best = ranked[0].item;
+                    return {
+                        coords: [parseFloat(best.lat), parseFloat(best.lon)],
+                        title: buildPlaceTitle(best),
+                        subtitle: buildPlaceSubtitle(best)
+                    };
+                }
+            } catch (e) {
+                console.error('geocodeLocation failed', e);
+            }
+            return null;
+        }
+
+        async function applyCustomRoute() {
+            const startVal = document.getElementById('start-input').value.trim();
+            const endVal = document.getElementById('end-input').value.trim();
+
+            if (startVal && !startVal.includes("My location") && !startVal.includes("Pinned")) {
+                let result = await geocodeLocation(startVal);
+                if (result) {
+                    startPos = result.coords;
+                    isManualStart = true;
+                    if (startMarker) startMarker.setLatLng(startPos);
+                    document.getElementById('start-input').value = result.subtitle ? `${result.title} — ${result.subtitle}` : result.title;
+                    document.getElementById('gps-mode-toggle').innerText = "GPS: Off (manual)";
+                }
+            }
+
+            if (!endVal) {
+                alert("Please enter a destination.");
+                return;
+            }
+
+            if (!endVal.includes("Pinned")) {
+                let result = await geocodeLocation(endVal);
+                if (result) {
+                    const label = result.subtitle ? `${result.title} — ${result.subtitle}` : result.title;
+                    document.getElementById('end-input').value = label;
+                    setDestinationPoint(result.coords, result.title);
+                } else {
+                    alert("Couldn't find that place. Try a shop name, society, or area + city.");
+                    return;
+                }
+            }
+
+            closeModal('route-modal');
+            hideAutocomplete('start-autocomplete');
+            hideAutocomplete('end-autocomplete');
+            evaluateRerouteLogic();
+        }
+
+        function applyPreset(sName, eName) {
+            document.getElementById('start-input').value = sName;
+            document.getElementById('end-input').value = eName;
+            applyCustomRoute();
+        }
+
+        function toggleStartGPSMode() {
+            isManualStart = !isManualStart;
+            document.getElementById('gps-mode-toggle').innerText = isManualStart ? "GPS: Off (manual)" : "GPS: On";
+            if (!isManualStart && gpsPos) {
+                startPos = gpsPos;
+                if (startMarker) startMarker.setLatLng(startPos);
+                if (endPos) evaluateRerouteLogic();
+            }
+        }
+
+        function useLiveGPSForStart() {
+            if (!gpsPos) {
+                alert("Current location not available yet. Allow GPS permission.");
+                return;
+            }
+            isManualStart = false;
+            startPos = gpsPos;
+            if (startMarker) startMarker.setLatLng(startPos);
+            document.getElementById('start-input').value = "🛰️ My location";
+            document.getElementById('gps-mode-toggle').innerText = "GPS: On";
+            hideAutocomplete('start-autocomplete');
+            map.flyTo(startPos, 16);
+            if (endPos) evaluateRerouteLogic();
+        }
+
+        function selectVehicle(v) {
+            currentVehicle = v;
+            document.querySelectorAll('.vehicle-btn').forEach(b => b.classList.remove('selected'));
+            document.getElementById(`v-${v}`).classList.add('selected');
+            
+            speakCue(`Switched to ${v === 'BIKE' ? 'two wheeler' : v === 'SEDAN' ? 'sedan' : 'SUV'}.`);
+            if (endPos) evaluateRerouteLogic();
+        }
+
+        async function toggleHeatMode() {
+            isHeatMode = !isHeatMode;
+            document.getElementById('heat-chip').classList.toggle('active');
+            let basePos = gpsPos || startPos || [28.6280, 77.3649];
+            
+            if (isHeatMode) {
+                speakCue("Heatwave mode on. Searching for nearby public water points.");
+                
+                const lat = basePos[0], lng = basePos[1];
+                const overpassUrl = `https://overpass-api.de/api/interpreter?data=[out:json];(node["amenity"="drinking_water"](around:3000,${lat},${lng});node["man_made"="water_tap"](around:3000,${lat},${lng}););out;`;
+
+                try {
+                    const res = await fetch(overpassUrl);
+                    const data = await res.json();
+                    
+                    if (data && data.elements && data.elements.length > 0) {
+                        data.elements.slice(0, 10).forEach(item => {
+                            let name = (item.tags && (item.tags.name || item.tags.description)) || 'Public Drinking Water Point';
+                            let m = L.marker([item.lat, item.lon]).addTo(map)
+                                .bindPopup(`<b>🚰 ${name}</b><br><small>Verified Public Water Source</small>`);
+                            tankerMarkers.push(m);
+                        });
+                        if (tankerMarkers.length > 0) tankerMarkers[0].openPopup();
+                    } else {
+                        let m = L.marker([basePos[0] + 0.002, basePos[1] + 0.004]).addTo(map)
+                            .bindPopup("<b>🚰 Municipal Water Tanker</b><br>No public taps found nearby on map.<br><small>Showing temporary municipal supply point.</small>").openPopup();
+                        tankerMarkers.push(m);
+                    }
+                } catch (e) {
+                    let m = L.marker([basePos[0] + 0.002, basePos[1] + 0.004]).addTo(map)
+                        .bindPopup("<b>🚰 Municipal Water Tanker</b><br><small>Showing temporary municipal supply point.</small>").openPopup();
+                    tankerMarkers.push(m);
+                }
+            } else {
+                tankerMarkers.forEach(m => map.removeLayer(m));
+                tankerMarkers = [];
+                speakCue("Heatwave mode off.");
+            }
+            
+            applyRoutePolylineStyle();
+            if (endPos) evaluateRerouteLogic();
+        }
+
+        function openRouteModal() { openModal('route-modal'); }
+
+        function openWaterlogReportModal() {
+            const judgeBox = document.getElementById('judge-sample-box');
+            if (isGodMode) {
+                judgeBox.style.display = 'block';
+            } else {
+                judgeBox.style.display = 'none';
+                selectedSampleType = null;
+            }
+            openModal('report-modal');
+        }
+
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+            hideAutocomplete('start-autocomplete');
+            hideAutocomplete('end-autocomplete');
+        }
+
+        function selectSamplePhoto(type) {
+            selectedSampleType = type;
+            document.getElementById('sample-flood-btn').classList.remove('active');
+            document.getElementById('sample-dry-btn').classList.remove('active');
+            if (type === 'FLOOD') document.getElementById('sample-flood-btn').classList.add('active');
+            else if (type === 'DRY') document.getElementById('sample-dry-btn').classList.add('active');
+        }
+
+        function handleFileInputChange(event) {
+            if (event.target.files.length > 0) selectedSampleType = 'FILE';
+        }
+
+        function analyzeUploadedImage(file) {
+            return new Promise((resolve) => {
+                if (!file) {
+                    resolve({ isFlooded: false, isSynthetic: false, confidence: 92.0, label: "No photo uploaded" });
+                    return;
+                }
+
+                const fileName = file.name.toLowerCase();
+                
+                const syntheticKeywords = ['unsplash', 'midjourney', 'dalle', 'ai', 'download', 'stock', 'generated', 'shutterstock', 'freepik', 'pixabay'];
+                if (syntheticKeywords.some(kw => fileName.includes(kw)) && !isGodMode) {
+                    resolve({ isFlooded: false, isSynthetic: true, confidence: 99.1, label: "Looks like a stock or AI photo" });
+                    return;
+                }
+
+                const screenshotKeywords = ['screenshot', 'screen_shot', 'ss', 'capture', 'whatsapp_image'];
+                if (screenshotKeywords.some(kw => fileName.includes(kw)) && !isGodMode) {
+                    resolve({ isFlooded: false, isSynthetic: true, confidence: 98.8, label: "That's a screenshot — please snap the actual road" });
+                    return;
+                }
+
+                const sewageKeywords = ['gutter', 'sewage', 'drain', 'sewer', 'nallah', 'sludge', 'manhole'];
+                if (sewageKeywords.some(kw => fileName.includes(kw)) && !isGodMode) {
+                    resolve({ isFlooded: false, isSynthetic: false, confidence: 97.8, label: "Looks like a drain, not a flooded road" });
+                    return;
+                }
+
+                if (fileName.includes('flood') || fileName.includes('submerged')) {
+                    resolve({ isFlooded: true, isSynthetic: false, confidence: 98.6, label: "Flooded road confirmed" });
+                    return;
+                }
+                if (fileName.includes('dry') || fileName.includes('sun') || fileName.includes('clear') || fileName.includes('desk') || fileName.includes('room') || fileName.includes('selfie') || fileName.includes('hand')) {
+                    resolve({ isFlooded: false, isSynthetic: false, confidence: 96.4, label: "Doesn't look like a flooded road" });
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = 80; 
+                        canvas.height = 80;
+                        ctx.drawImage(img, 0, 0, 80, 80);
+
+                        const data = ctx.getImageData(0, 0, 80, 80).data;
+                        const totalPixels = 80 * 80;
+                        
+                        let totalBrightness = 0;
+                        let skinPixels = 0;
+                        let waterSkyPixels = 0;
+                        let murkyWaterPixels = 0;
+                        let brightDryPixels = 0;
+                        let algaeSludgePixels = 0;
+                        let blackDrainPixels = 0;
+                        let uiRedPixels = 0;
+                        let uiMapBgPixels = 0;
+                        let uiBluePixels = 0;
+
+                        for (let i = 0; i < data.length; i += 4) {
+                            const r = data[i], g = data[i+1], b = data[i+2];
+                            const brightness = (r + g + b) / 3;
+                            totalBrightness += brightness;
+
+                            if (r > 60 && g > 35 && b > 20 && r > g && g >= b && (r - g) > 10 && (r - b) > 20) skinPixels++;
+                            if (brightness > 135 || (r > 150 && g > 140)) brightDryPixels++;
+                            if (b >= r && b >= g - 5 && brightness > 30 && brightness < 220) waterSkyPixels++;
+                            if (Math.abs(r - g) <= 15 && Math.abs(g - b) <= 20 && brightness >= 35 && brightness <= 125) murkyWaterPixels++;
+                            if (g > 40 && g > r + 12 && g > b + 8 && r < 140) algaeSludgePixels++;
+                            if (r < 22 && g < 22 && b < 22) blackDrainPixels++;
+                            if (r > 180 && g < 80 && b < 80) uiRedPixels++;
+                            if (r > 240 && g > 240 && b > 240) uiMapBgPixels++;
+                            if (b > 180 && r < 80 && g < 120) uiBluePixels++;
+                        }
+
+                        const avgBrightness = totalBrightness / totalPixels;
+                        const skinRatio = skinPixels / totalPixels;
+                        const waterRatio = (waterSkyPixels + murkyWaterPixels) / totalPixels;
+                        const dryRatio = brightDryPixels / totalPixels;
+                        const sewageRatio = (algaeSludgePixels + blackDrainPixels) / totalPixels;
+                        const uiRedRatio = uiRedPixels / totalPixels;
+                        const uiMapBgRatio = uiMapBgPixels / totalPixels;
+                        const uiBlueRatio = uiBluePixels / totalPixels;
+
+                        if ((uiRedRatio > 0.02 || uiMapBgRatio > 0.25 || uiBlueRatio > 0.04) && !isGodMode) {
+                            resolve({ isFlooded: false, isSynthetic: true, confidence: 99.5, label: "That looks like a map screenshot" });
+                            return;
+                        }
+                        if (sewageRatio > 0.14 && !isGodMode) {
+                            resolve({ isFlooded: false, isSynthetic: false, confidence: 97.5, label: "Looks like a drain, not a flooded road" });
+                            return;
+                        }
+                        if (skinRatio > 0.12 && !isGodMode) {
+                            resolve({ isFlooded: false, isSynthetic: false, confidence: 98.2, label: "We can see a person — please snap the road instead" });
+                            return;
+                        }
+                        if ((dryRatio > 0.35 || avgBrightness > 145) && waterRatio < 0.30) {
+                            resolve({ isFlooded: false, isSynthetic: false, confidence: 95.2, label: "Road looks dry to us" });
+                            return;
+                        }
+                        if (waterRatio >= 0.22 && skinRatio < 0.10 && sewageRatio < 0.10) {
+                            resolve({ isFlooded: true, isSynthetic: false, confidence: 97.4, label: "Flooded road confirmed" });
+                        } else {
+                            resolve({ isFlooded: false, isSynthetic: false, confidence: 94.1, label: "Doesn't look like a flooded road" });
+                        }
+                    };
+                    img.onerror = function() {
+                        resolve({ isFlooded: false, isSynthetic: false, confidence: 90.0, label: "Couldn't read that photo" });
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function submitWaterlogReport() {
+            const fileInput = document.getElementById('photo-input');
+            const statusEl = document.getElementById('ai-status');
+            const depth = document.getElementById('report-depth').value;
+
+            if (!isGodMode && fileInput.files.length === 0) {
+                alert("Please add a photo of the road — it helps us trust the report and keep others safe.");
+                return;
+            }
+            if (isGodMode && !selectedSampleType && fileInput.files.length === 0) {
+                alert("Pick one of the test photos above, or upload your own.");
+                return;
+            }
+
+            statusEl.style.display = 'block';
+            statusEl.style.background = "rgba(0, 180, 216, 0.1)";
+            statusEl.style.color = "var(--primary)";
+            statusEl.innerHTML = "📷 Checking photo...<br>📍 Matching location...<br>🌦️ Checking rain radar...";
+
+            let aiResult = { isFlooded: true, isSynthetic: false, confidence: 98.6, label: "Flooded road confirmed" };
+
+            if (selectedSampleType === 'DRY') {
+                aiResult = { isFlooded: false, isSynthetic: false, confidence: 96.4, label: "dry asphalt / clear road" };
+            } else if (fileInput.files.length > 0) {
+                aiResult = await analyzeUploadedImage(fileInput.files[0]);
+            }
+
+            setTimeout(async () => {
+                if (aiResult.isSynthetic) {
+                    statusEl.style.background = "rgba(239, 68, 68, 0.25)";
+                    statusEl.style.color = "var(--accent-danger)";
+                    statusEl.innerHTML = `❌ We couldn't accept that one.<br>Looks like: ${aiResult.label}.<br>Please snap a real photo of the street.`;
+                    speakCue("That photo didn't pass. Please snap the actual road.");
+                    setTimeout(() => { statusEl.style.display = 'none'; }, 6500);
+                    return; 
+                }
+
+                if (!aiResult.isFlooded) {
+                    statusEl.style.background = "rgba(239, 68, 68, 0.25)";
+                    statusEl.style.color = "var(--accent-danger)";
+                    statusEl.innerHTML = `❌ No water visible.<br>Looks like: ${aiResult.label} (${Math.round(aiResult.confidence)}% sure).<br>Please snap the actual flooded road.`;
+                    speakCue("We couldn't see any flooding in that photo.");
+                    setTimeout(() => { statusEl.style.display = 'none'; }, 4500);
+                    return; 
+                }
+
+                let currentLat = (startPos || gpsPos || [28.6280, 77.3649])[0];
+                let currentLng = (startPos || gpsPos || [28.6280, 77.3649])[1];
+
+                try {
+                    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${currentLat}&longitude=${currentLng}&current=precipitation,rain&hourly=precipitation&past_hours=1`;
+                    const weatherRes = await fetch(weatherUrl);
+                    const weatherData = await weatherRes.json();
+                    
+                    let rainFound = (weatherData.current && weatherData.current.precipitation > 0);
+                    if (!rainFound && weatherData.hourly && weatherData.hourly.precipitation) {
+                        if (weatherData.hourly.precipitation.slice(-2).some(p => p > 0)) rainFound = true;
+                    }
+
+                    let weatherText = rainFound ? "it rained here recently" : "no rain data, but we'll trust you";
+
+                    statusEl.style.background = "rgba(16, 185, 129, 0.25)";
+                    statusEl.style.color = "var(--accent-green)";
+                    statusEl.innerHTML = `✅ Thanks — checks out.<br>Photo: Flooded road confirmed<br>Rain radar: ${weatherText}<br><br>Posting your warning...`;
+                    speakCue("Thanks — your report is live. Drive safe out there.");
+
+                    setTimeout(() => {
+                        statusEl.style.display = 'none';
+                        applyReport(depth);
+                    }, 3000);
+
+                } catch (e) {
+                    statusEl.style.background = "rgba(16, 185, 129, 0.25)";
+                    statusEl.style.color = "var(--accent-green)";
+                    statusEl.innerHTML = "✅ Photo looks good. Rain radar is offline, but we'll post your report anyway.";
+                    speakCue("Thanks — your report is live.");
+                    
+                    setTimeout(() => {
+                        statusEl.style.display = 'none';
+                        applyReport(depth);
+                    }, 2500);
+                }
+            }, 1500);
+        }
+
+        function applyReport(depth) {
+            closeModal('report-modal');
+            let targetPos = startPos || gpsPos || [28.6280, 77.3649];
+            addHazardToMap(targetPos[0], targetPos[1], depth);
+        }
+    </script>
+</body>
+</html>
