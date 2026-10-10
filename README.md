@@ -105,8 +105,8 @@ Crowdsourced hazard reporting usually breaks down due to fake submissions. AquaT
 
 ## 🔗 Links
 
-* **Live PWA App:** [https://devanssh01.github.io/AquaTread/](https://devanssh01.github.io/AquaTread/)
-* **Backend Source Code:** [AquaTread-Bharat-builds GitHub Repository (Backend)](https://github.com/devanssh01/AquaTread/tree/main/backend)
+* **Live PWA App:** https://devanssh01.github.io/AquaTread-Bharat-builds-/
+* **Backend Source Code:** [AquaTread-Bharat-builds GitHub Repository (Backend)]https://github.com/devanssh01/AquaTread-Bharat-builds-/blob/a245d3d520a09ef9a7fc068d805e9179cdca8e91/backend/aws_rekognition_handler.py
 * **Technical Blog:** Published on AWS Builder Center *(Link updated upon publishing)*
 * **Event:** Bharat Build Tour (DTU Delhi) by AWS & WeMakeDevs
 ```
