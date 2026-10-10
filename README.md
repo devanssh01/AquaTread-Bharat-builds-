@@ -5,6 +5,8 @@
 
 Live PWA Demo: [https://devanssh01.github.io/AquaTread-Bharat-builds-/](https://devanssh01.github.io/AquaTread-Bharat-builds-/)
 
+Blog link: <Author: Devansh Upadhyay> https://builder.aws.com/content/3KQhSQkeRYCMIEM7x3TQ1DkQIO6/aquatread-bharat-how-we-built-vehicle-aware-navigation-with-aws-ai
+
 ## 🧪 30-Second Quick Testing Guide for Judges
 
 If you are testing the live app, follow these 4 quick steps:
@@ -64,11 +66,24 @@ AquaTread-Bharat-builds-/
 └── backend/
 └── aws_rekognition_handler.py # AWS Lambda + Amazon Rekognition (Boto3)
 
-## 🚀 How to Run Locally
-1. Clone the repo
-2. Open `index.html` in any modern browser (Chrome/Edge recommended)
-3. Allow Location permission when prompted
-4. For AWS Rekognition: Deploy `aws_rekognition_handler.py` as Lambda function
+## 🚀 Quick Start & Testing Options
+
+### Option 1: Instant Live Web App (No Setup Required)
+Directly open the live PWA in your browser:
+👉 **[https://devanssh01.github.io/AquaTread-Bharat-builds-/](https://devanssh01.github.io/AquaTread-Bharat-builds-/)**
+
+---
+
+### Option 2: Run Locally on Your Computer
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/devanssh01/AquaTread-Bharat-builds-.git
+   Open the Application:
+2. Double-click index.html to open it in Chrome, Edge, or Firefox.
+   No npm install, node_modules, or local server setup required!
+3. Grant Location Permission: Allow GPS access when prompted to initialize live routing.
+4. Test Rerouting Engine: Click ⚡ God Mode on the top bar and double-click anywhere on the map route to drop simulated flood hazards.
+
 
 ## 🎥 Demo Video
 *(Paste your YouTube/Drive demo video link here once recorded)*
