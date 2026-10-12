@@ -86,4 +86,4 @@ Directly open the live PWA in your browser:
 
 
 ## 🎥 Demo Video
-*(Paste your YouTube/Drive demo video link here once recorded)*
+https://www.youtube.com/shorts/qjZKb658yzY?si=YeeABpSWcImCUGCj
